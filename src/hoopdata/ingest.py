@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from hoopdata import transform
 from hoopdata.source import PLAYER, SEASON_TYPES
+from hoopdata.store import SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
 
@@ -27,6 +28,7 @@ def ingest(source, store, seasons):
             raw = source.game_log(season, season_type, PLAYER)
             df = transform.player_box_scores(raw, season, season_type)
             store.write_partition(PLAYER_BOX_SCORES, season, season_type, df)
+            store.record_item(PLAYER_BOX_SCORES, season, season_type, SUCCEEDED, rows=len(df))
             report.items.append(Item(PLAYER_BOX_SCORES, season, season_type, len(df)))
     store.publish()
     return report

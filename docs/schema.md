@@ -76,3 +76,52 @@ One row per player per season and season type. A player traded mid-season has on
 | `ft_pct` | DOUBLE | `sum(ftm) / sum(fta)` over the season |
 
 Season percentages come from summed makes and attempts, not from averaging per-game percentages.
+
+### `hoopdata_info`
+
+One row describing the data. It reads `manifest.json` at query time, so it shows the latest run without reopening or rebuilding anything.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `schema_version` | INTEGER | Version of this schema (see below) |
+| `last_updated` | TIMESTAMP WITH TIME ZONE | When an item was last recorded in the manifest |
+
+```sql
+select schema_version, last_updated from hoopdata_info
+```
+
+## Manifest
+
+`manifest.json` in the data root is part of the contract. It records what the pipeline has fetched:
+
+```json
+{
+  "schema_version": 1,
+  "last_updated": "2026-11-26T11:00:00.123456+00:00",
+  "items": [
+    {
+      "table": "player_box_scores",
+      "season": "2023-24",
+      "season_type": "Regular Season",
+      "status": "succeeded",
+      "fetched_at": "2026-11-26T11:00:00.123456+00:00",
+      "rows": 59,
+      "error": null
+    }
+  ],
+  "views_hash": "..."
+}
+```
+
+- **`schema_version`**: the version of this schema.
+- **`last_updated`**: UTC time the latest item was recorded.
+- **`items`**: one entry per table, season and season type, holding the outcome of its latest fetch: `status`, `fetched_at` (UTC), `rows` and `error` (`null` when it succeeded).
+- **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
+
+## When `hoopdata.duckdb` is rebuilt
+
+Only when the views or the schema version change, or on the next ingest after the data root moves (the views hold absolute paths). New data needs no rebuild: the views read the Parquet files and the manifest at query time.
+
+## Schema version
+
+The schema version is bumped on any breaking change: a column renamed or removed, or its meaning changed. Adding a table, view or column is not breaking. Check `hoopdata_info.schema_version` and fail loudly when it isn't the version your project was written against.
