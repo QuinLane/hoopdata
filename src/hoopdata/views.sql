@@ -1,6 +1,13 @@
 -- The shared queries every consumer uses, published as views in hoopdata.duckdb.
 -- {root} is replaced with the absolute data root path when the file is built.
 
+create view hoopdata_info as
+select schema_version, last_updated
+from read_json(
+    '{root}/manifest.json',
+    columns = {schema_version: 'INTEGER', last_updated: 'TIMESTAMPTZ'}
+);
+
 create view player_box_scores as
 select
     season, season_type, game_id, game_date,
