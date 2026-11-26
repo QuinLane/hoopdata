@@ -210,7 +210,7 @@ select schema_version, last_updated from hoopdata_info
       "season_type": "Regular Season",
       "status": "succeeded",
       "fetched_at": "2026-11-26T11:00:00.123456+00:00",
-      "rows": 59,
+      "rows": 64,
       "error": null
     }
   ],

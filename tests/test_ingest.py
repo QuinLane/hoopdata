@@ -22,6 +22,10 @@ RAPTORS = 1610612761
 PACERS = 1610612754
 AUSTIN_REAVES = 1630559  # undrafted
 NUGGETS = 1610612743
+CELTICS = 1610612738
+SUNS = 1610612756
+BLAZERS = 1610612757
+JAZZ = 1610612762
 
 
 @pytest.fixture
@@ -89,7 +93,7 @@ def test_a_failed_item_is_recorded_and_the_other_items_complete(tmp_path):
         player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
         games = con.execute("select count(*) from games").fetchone()[0]
     assert player_rows == 64
-    assert games == 4
+    assert games == 9
 
 
 def test_a_second_run_retries_only_the_failed_item(tmp_path):
@@ -400,7 +404,8 @@ def test_ingest_after_the_data_root_moves_rebuilds_the_file(tmp_path):
 
 
 def test_standings_count_wins_and_losses_per_season_type(db):
-    # Fixture games: DEN beat DAL and LAC at home, lost at NOP, then beat LAL in the playoffs.
+    # Fixture games: DEN beat DAL and LAC at home, lost at NOP, won at IND, then beat LAL in the playoffs.
+    # Siakam's games: TOR lost at UTA and to BOS at home, then IND lost at POR, at PHX and to DEN at home.
     rows = db.execute(
         """
         select season_type, team_id, wins, losses from standings
@@ -411,10 +416,16 @@ def test_standings_count_wins_and_losses_per_season_type(db):
     assert rows == [
         ("Playoffs", DENVER, 1, 0),
         ("Playoffs", LAKERS, 0, 1),
+        ("Regular Season", CELTICS, 1, 0),
         ("Regular Season", PELICANS, 1, 0),
         ("Regular Season", MAVERICKS, 0, 1),
-        ("Regular Season", DENVER, 2, 1),
+        ("Regular Season", DENVER, 3, 1),
         ("Regular Season", CLIPPERS, 0, 1),
+        ("Regular Season", PACERS, 0, 3),
+        ("Regular Season", SUNS, 1, 0),
+        ("Regular Season", BLAZERS, 1, 0),
+        ("Regular Season", RAPTORS, 0, 2),
+        ("Regular Season", JAZZ, 1, 0),
     ]
 
 
@@ -430,8 +441,30 @@ def test_games_have_one_row_each_with_home_and_away_from_the_matchup(db):
         ("0022300006", "2023-24", "Regular Season", date(2023, 11, 3), DENVER, MAVERICKS, 125, 114),
         ("0022300024", "2023-24", "Regular Season", date(2023, 11, 14), DENVER, CLIPPERS, 111, 108),
         ("0022300034", "2023-24", "Regular Season", date(2023, 11, 17), PELICANS, DENVER, 115, 110),
+        ("0022300540", "2023-24", "Regular Season", date(2024, 1, 12), JAZZ, RAPTORS, 145, 113),
+        ("0022300563", "2023-24", "Regular Season", date(2024, 1, 15), RAPTORS, CELTICS, 96, 105),
+        ("0022300590", "2023-24", "Regular Season", date(2024, 1, 19), BLAZERS, PACERS, 118, 115),
+        ("0022300604", "2023-24", "Regular Season", date(2024, 1, 21), SUNS, PACERS, 117, 110),
+        ("0022300614", "2023-24", "Regular Season", date(2024, 1, 23), PACERS, DENVER, 109, 114),
         ("0042300151", "2023-24", "Playoffs", date(2024, 4, 20), DENVER, LAKERS, 114, 103),
     ]
+
+
+def test_every_game_in_the_player_box_scores_has_exactly_one_games_row(tmp_path):
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2022-23", "2023-24"])
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        rows_per_game = con.execute(
+            """
+            select p.game_id, count(g.game_id)
+            from (select distinct game_id from player_box_scores) p
+            left join games g using (game_id)
+            group by p.game_id order by p.game_id
+            """
+        ).fetchall()
+
+    assert len(rows_per_game) == 11
+    assert {count for _, count in rows_per_game} == {1}
 
 
 def test_team_box_scores_are_player_box_scores_without_the_player_fields(db):
@@ -446,7 +479,7 @@ def test_team_box_scores_are_player_box_scores_without_the_player_fields(db):
 
 
 def test_team_season_percentages_come_from_summed_makes_and_attempts(db):
-    # Denver, 3 regular season games: 49/93, 39/73, 47/96. Summed: 135/262.
+    # Denver, 4 regular season games: 49/93, 39/73, 47/96, 44/88. Summed: 179/350.
     games, pts, fg_pct = db.execute(
         """
         select games_played, pts, fg_pct from team_season_averages
@@ -455,9 +488,9 @@ def test_team_season_percentages_come_from_summed_makes_and_attempts(db):
         [DENVER],
     ).fetchone()
 
-    assert games == 3
-    assert pts == pytest.approx((125 + 111 + 110) / 3)
-    assert fg_pct == pytest.approx(135 / 262)
+    assert games == 4
+    assert pts == pytest.approx((125 + 111 + 110 + 114) / 4)
+    assert fg_pct == pytest.approx(179 / 350)
 
 
 def test_team_game_stats_calculates_per_game_percentages(db):
