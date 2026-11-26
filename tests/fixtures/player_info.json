@@ -10913,5 +10913,3080 @@
     ]
    }
   ]
+ },
+ "201145": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 201145
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      201145,
+      "Jeff",
+      "Green",
+      "Jeff Green",
+      "Green, Jeff",
+      "J. Green",
+      "jeff-green",
+      "1986-08-28T00:00:00",
+      "Georgetown",
+      "USA",
+      "Georgetown/USA",
+      "6-8",
+      "235",
+      20,
+      "32",
+      "Forward",
+      "Inactive",
+      "N",
+      1610612745,
+      "Rockets",
+      "HOU",
+      "rockets",
+      "Houston",
+      "jeff_green",
+      2007,
+      2025,
+      "N",
+      "Y",
+      "Y",
+      "2007",
+      "1",
+      "5",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      201145,
+      "Jeff Green",
+      "career",
+      11.6,
+      1.4,
+      3.9,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12007"
+     ],
+     [
+      "22007"
+     ],
+     [
+      "12008"
+     ],
+     [
+      "22008"
+     ],
+     [
+      "12009"
+     ],
+     [
+      "22009"
+     ],
+     [
+      "42009"
+     ],
+     [
+      "12010"
+     ],
+     [
+      "22010"
+     ],
+     [
+      "42010"
+     ],
+     [
+      "12012"
+     ],
+     [
+      "22012"
+     ],
+     [
+      "42012"
+     ],
+     [
+      "12013"
+     ],
+     [
+      "22013"
+     ],
+     [
+      "12014"
+     ],
+     [
+      "22014"
+     ],
+     [
+      "42014"
+     ],
+     [
+      "12015"
+     ],
+     [
+      "22015"
+     ],
+     [
+      "42015"
+     ],
+     [
+      "12016"
+     ],
+     [
+      "22016"
+     ],
+     [
+      "12017"
+     ],
+     [
+      "22017"
+     ],
+     [
+      "42017"
+     ],
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "42019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "12024"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "42024"
+     ],
+     [
+      "12025"
+     ],
+     [
+      "22025"
+     ],
+     [
+      "42025"
+     ]
+    ]
+   }
+  ]
+ },
+ "201976": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 201976
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      201976,
+      "Patrick",
+      "Beverley",
+      "Patrick Beverley",
+      "Beverley, Patrick",
+      "P. Beverley",
+      "patrick-beverley",
+      "1988-07-12T00:00:00",
+      "Arkansas",
+      "USA",
+      "Arkansas/USA",
+      "6-2",
+      "180",
+      13,
+      "21",
+      "Guard",
+      "Inactive",
+      "N",
+      1610612749,
+      "Bucks",
+      "MIL",
+      "bucks",
+      "Milwaukee",
+      "patrick_beverley",
+      2012,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "2009",
+      "2",
+      "42",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      201976,
+      "Patrick Beverley",
+      "career",
+      8.3,
+      3.4,
+      4.1,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12010"
+     ],
+     [
+      "22012"
+     ],
+     [
+      "42012"
+     ],
+     [
+      "12013"
+     ],
+     [
+      "22013"
+     ],
+     [
+      "42013"
+     ],
+     [
+      "12014"
+     ],
+     [
+      "22014"
+     ],
+     [
+      "12015"
+     ],
+     [
+      "22015"
+     ],
+     [
+      "42015"
+     ],
+     [
+      "12016"
+     ],
+     [
+      "22016"
+     ],
+     [
+      "42016"
+     ],
+     [
+      "12017"
+     ],
+     [
+      "22017"
+     ],
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "42019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "52021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "52022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "42023"
+     ]
+    ]
+   }
+  ]
+ },
+ "202397": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 202397
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      202397,
+      "Ish",
+      "Smith",
+      "Ish Smith",
+      "Smith, Ish",
+      "I. Smith",
+      "ish-smith",
+      "1988-07-05T00:00:00",
+      "Wake Forest",
+      "USA",
+      "Wake Forest/USA",
+      "6-0",
+      "175",
+      14,
+      "",
+      "Guard",
+      "Inactive",
+      "N",
+      0,
+      "",
+      "",
+      "",
+      "",
+      "ish_smith",
+      2010,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "Undrafted",
+      "Undrafted",
+      "Undrafted",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      202397,
+      "Ish Smith",
+      "career",
+      7.1,
+      3.8,
+      2.4,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12010"
+     ],
+     [
+      "22010"
+     ],
+     [
+      "42010"
+     ],
+     [
+      "12011"
+     ],
+     [
+      "22011"
+     ],
+     [
+      "42011"
+     ],
+     [
+      "12012"
+     ],
+     [
+      "22012"
+     ],
+     [
+      "42012"
+     ],
+     [
+      "12013"
+     ],
+     [
+      "22013"
+     ],
+     [
+      "12014"
+     ],
+     [
+      "22014"
+     ],
+     [
+      "12015"
+     ],
+     [
+      "22015"
+     ],
+     [
+      "12016"
+     ],
+     [
+      "22016"
+     ],
+     [
+      "12017"
+     ],
+     [
+      "22017"
+     ],
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "52020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "22023"
+     ]
+    ]
+   }
+  ]
+ },
+ "203471": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 203471
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      203471,
+      "Dennis",
+      "Schr\u00f6der",
+      "Dennis Schr\u00f6der",
+      "Schr\u00f6der, Dennis",
+      "D. Schr\u00f6der",
+      "dennis-schr\u00f6der",
+      "1993-09-15T00:00:00",
+      "Braunschweig",
+      "Germany",
+      "Braunschweig/Germany",
+      "6-1",
+      "175",
+      13,
+      "17",
+      "Guard",
+      "Active",
+      "Y",
+      1610612766,
+      "Hornets",
+      "CHA",
+      "hornets",
+      "Charlotte",
+      "dennis_schroder",
+      2013,
+      2026,
+      "Y",
+      "Y",
+      "Y",
+      "2013",
+      "1",
+      "17",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "PIE"
+    ],
+    "rowSet": [
+     [
+      203471,
+      "Dennis Schr\u00f6der",
+      "2026-27",
+      10.2,
+      4.9,
+      3.6,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12013"
+     ],
+     [
+      "22013"
+     ],
+     [
+      "42013"
+     ],
+     [
+      "12014"
+     ],
+     [
+      "22014"
+     ],
+     [
+      "42014"
+     ],
+     [
+      "12015"
+     ],
+     [
+      "22015"
+     ],
+     [
+      "42015"
+     ],
+     [
+      "12016"
+     ],
+     [
+      "22016"
+     ],
+     [
+      "42016"
+     ],
+     [
+      "12017"
+     ],
+     [
+      "22017"
+     ],
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "42019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "52020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "52022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "12024"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "42024"
+     ],
+     [
+      "12025"
+     ],
+     [
+      "22025"
+     ],
+     [
+      "42025"
+     ],
+     [
+      "12026"
+     ],
+     [
+      "22026"
+     ]
+    ]
+   }
+  ]
+ },
+ "1627745": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1627745
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1627745,
+      "Damian",
+      "Jones",
+      "Damian Jones",
+      "Jones, Damian",
+      "D. Jones",
+      "damian-jones",
+      "1995-06-30T00:00:00",
+      "Vanderbilt",
+      "USA",
+      "Vanderbilt/USA",
+      "6-10",
+      "245",
+      9,
+      "30",
+      "Center",
+      "Inactive",
+      "N",
+      1610612739,
+      "Cavaliers",
+      "CLE",
+      "cavaliers",
+      "Cleveland",
+      "damian_jones",
+      2016,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "2016",
+      "1",
+      "30",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1627745,
+      "Damian Jones",
+      "career",
+      4.9,
+      0.7,
+      3.1,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "22016"
+     ],
+     [
+      "42016"
+     ],
+     [
+      "12017"
+     ],
+     [
+      "22017"
+     ],
+     [
+      "42017"
+     ],
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "42023"
+     ]
+    ]
+   }
+  ]
+ },
+ "1628427": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1628427
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1628427,
+      "Vlatko",
+      "\u010can\u010dar",
+      "Vlatko \u010can\u010dar",
+      "\u010can\u010dar, Vlatko",
+      "V. \u010can\u010dar",
+      "vlatko-\u010dan\u010dar",
+      "1997-04-10T00:00:00",
+      "San Pablo Burgos",
+      "Slovenia",
+      "San Pablo Burgos/Slovenia",
+      "6-8",
+      "236",
+      7,
+      "31",
+      "Forward",
+      "Inactive",
+      "N",
+      1610612743,
+      "Nuggets",
+      "DEN",
+      "nuggets",
+      "Denver",
+      "vlatko_cancar",
+      2019,
+      2024,
+      "Y",
+      "Y",
+      "Y",
+      "2017",
+      "2",
+      "49",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1628427,
+      "Vlatko \u010can\u010dar",
+      "career",
+      3.4,
+      0.9,
+      1.8,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "12024"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "42024"
+     ]
+    ]
+   }
+  ]
+ },
+ "1628432": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1628432
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1628432,
+      "Davon",
+      "Reed",
+      "Davon Reed",
+      "Reed, Davon",
+      "D. Reed",
+      "davon-reed",
+      "1995-06-11T00:00:00",
+      "Miami",
+      "USA",
+      "Miami/USA",
+      "6-5",
+      "206",
+      4,
+      "",
+      "Guard",
+      "Inactive",
+      "N",
+      0,
+      "",
+      "",
+      "",
+      "",
+      "davon_reed",
+      2017,
+      2022,
+      "Y",
+      "Y",
+      "Y",
+      "2017",
+      "2",
+      "32",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1628432,
+      "Davon Reed",
+      "career",
+      3.1,
+      0.8,
+      1.7,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "22017"
+     ],
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ]
+    ]
+   }
+  ]
+ },
+ "1628971": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1628971
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      1628971,
+      "Bruce",
+      "Brown",
+      "Bruce Brown",
+      "Brown, Bruce",
+      "B. Brown",
+      "bruce-brown",
+      "1996-08-15T00:00:00",
+      "Miami",
+      "USA",
+      "Miami/USA",
+      "6-4",
+      "202",
+      9,
+      "11",
+      "Guard-Forward",
+      "Inactive",
+      "Y",
+      1610612743,
+      "Nuggets",
+      "DEN",
+      "nuggets",
+      "Denver",
+      "bruce_brown",
+      2018,
+      2025,
+      "Y",
+      "Y",
+      "Y",
+      "2018",
+      "2",
+      "42",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1628971,
+      "Bruce Brown",
+      "career",
+      8.7,
+      2.4,
+      4.2,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "52021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "62023"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "12025"
+     ],
+     [
+      "22025"
+     ],
+     [
+      "42025"
+     ],
+     [
+      "12026"
+     ]
+    ]
+   }
+  ]
+ },
+ "1628972": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1628972
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1628972,
+      "Troy",
+      "Brown Jr.",
+      "Troy Brown Jr.",
+      "Brown Jr., Troy",
+      "T. Brown Jr.",
+      "troy-brown-jr",
+      "1999-07-28T00:00:00",
+      "Oregon",
+      "USA",
+      "Oregon/USA",
+      "6-7",
+      "215",
+      7,
+      "7",
+      "Guard-Forward",
+      "Inactive",
+      "N",
+      1610612765,
+      "Pistons",
+      "DET",
+      "pistons",
+      "Detroit",
+      "troy_brown_jr",
+      2018,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "2018",
+      "1",
+      "15",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1628972,
+      "Troy Brown Jr.",
+      "career",
+      6.2,
+      1.4,
+      3.6,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "52022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ]
+    ]
+   }
+  ]
+ },
+ "1629020": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1629020
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      1629020,
+      "Jarred",
+      "Vanderbilt",
+      "Jarred Vanderbilt",
+      "Vanderbilt, Jarred",
+      "J. Vanderbilt",
+      "jarred-vanderbilt",
+      "1999-04-03T00:00:00",
+      "Kentucky",
+      "USA",
+      "Kentucky/USA",
+      "6-8",
+      "214",
+      8,
+      "2",
+      "Forward",
+      "Active",
+      "Y",
+      1610612747,
+      "Lakers",
+      "LAL",
+      "lakers",
+      "Los Angeles",
+      "jarred_vanderbilt",
+      2018,
+      2026,
+      "Y",
+      "Y",
+      "Y",
+      "2018",
+      "2",
+      "41",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "PIE"
+    ],
+    "rowSet": [
+     [
+      1629020,
+      "Jarred Vanderbilt",
+      "2026-27",
+      2.1,
+      1.2,
+      4.0,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "52021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "52022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "62023"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "42024"
+     ],
+     [
+      "12025"
+     ],
+     [
+      "22025"
+     ],
+     [
+      "42025"
+     ],
+     [
+      "12026"
+     ],
+     [
+      "22026"
+     ]
+    ]
+   }
+  ]
+ },
+ "1629022": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1629022
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      1629022,
+      "Lonnie",
+      "Walker IV",
+      "Lonnie Walker IV",
+      "Walker IV, Lonnie",
+      "L. Walker IV",
+      "lonnie-walker-iv",
+      "1998-12-14T00:00:00",
+      "Miami",
+      "USA",
+      "Miami/USA",
+      "6-4",
+      "204",
+      8,
+      "16",
+      "Guard-Forward",
+      "Inactive",
+      "Y",
+      1610612755,
+      "76ers",
+      "PHI",
+      "sixers",
+      "Philadelphia",
+      "lonnie_walker",
+      2018,
+      2024,
+      "Y",
+      "Y",
+      "Y",
+      "2018",
+      "1",
+      "18",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1629022,
+      "Lonnie Walker IV",
+      "career",
+      10.0,
+      1.5,
+      2.3,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12018"
+     ],
+     [
+      "22018"
+     ],
+     [
+      "42018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "52020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "52021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "12024"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "12026"
+     ]
+    ]
+   }
+  ]
+ },
+ "1629117": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1629117
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1629117,
+      "Wenyen",
+      "Gabriel",
+      "Wenyen Gabriel",
+      "Gabriel, Wenyen",
+      "W. Gabriel",
+      "wenyen-gabriel",
+      "1997-03-26T00:00:00",
+      "Kentucky",
+      "South Sudan",
+      "Kentucky/South Sudan",
+      "6-9",
+      "205",
+      5,
+      "",
+      "Forward",
+      "Inactive",
+      "N",
+      0,
+      "",
+      "",
+      "",
+      "",
+      "wenyen_gabriel",
+      2018,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "Undrafted",
+      "Undrafted",
+      "Undrafted",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1629117,
+      "Wenyen Gabriel",
+      "career",
+      4.4,
+      0.5,
+      3.4,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "42019"
+     ],
+     [
+      "52019"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "52022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ]
+    ]
+   }
+  ]
+ },
+ "1629134": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1629134
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1629134,
+      "Kendrick",
+      "Nunn",
+      "Kendrick Nunn",
+      "Nunn, Kendrick",
+      "K. Nunn",
+      "kendrick-nunn",
+      "1995-08-03T00:00:00",
+      "Oakland",
+      "USA",
+      "Oakland/USA",
+      "6-3",
+      "190",
+      4,
+      "20",
+      "Guard",
+      "Inactive",
+      "N",
+      1610612764,
+      "Wizards",
+      "WAS",
+      "wizards",
+      "Washington",
+      "kendrick_nunn",
+      2018,
+      2022,
+      "Y",
+      "Y",
+      "Y",
+      "Undrafted",
+      "Undrafted",
+      "Undrafted",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1629134,
+      "Kendrick Nunn",
+      "career",
+      12.1,
+      2.4,
+      2.4,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12018"
+     ],
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "42019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "42020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ]
+    ]
+   }
+  ]
+ },
+ "1629308": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1629308
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1629308,
+      "Juan",
+      "Toscano-Anderson",
+      "Juan Toscano-Anderson",
+      "Toscano-Anderson, Juan",
+      "J. Toscano-Anderson",
+      "juan-toscano-anderson",
+      "1993-04-10T00:00:00",
+      "Marquette",
+      "USA",
+      "Marquette/USA",
+      "6-6",
+      "209",
+      5,
+      "",
+      "Forward",
+      "Inactive",
+      "N",
+      0,
+      "",
+      "",
+      "",
+      "",
+      "juan_toscano-anderson",
+      2019,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "Undrafted",
+      "Undrafted",
+      "Undrafted",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1629308,
+      "Juan Toscano-Anderson",
+      "career",
+      4.1,
+      1.8,
+      3.0,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12019"
+     ],
+     [
+      "22019"
+     ],
+     [
+      "12020"
+     ],
+     [
+      "22020"
+     ],
+     [
+      "52020"
+     ],
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "22023"
+     ]
+    ]
+   }
+  ]
+ },
+ "1630538": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1630538
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      1630538,
+      "Bones",
+      "Hyland",
+      "Bones Hyland",
+      "Hyland, Bones",
+      "B. Hyland",
+      "bones-hyland",
+      "2000-09-14T00:00:00",
+      "Virginia Commonwealth",
+      "USA",
+      "Virginia Commonwealth/USA",
+      "6-2",
+      "169",
+      5,
+      "8",
+      "Guard",
+      "Active",
+      "Y",
+      1610612750,
+      "Timberwolves",
+      "MIN",
+      "timberwolves",
+      "Minnesota",
+      "nahshon_hyland",
+      2021,
+      2026,
+      "Y",
+      "Y",
+      "Y",
+      "2021",
+      "1",
+      "26",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "PIE"
+    ],
+    "rowSet": [
+     [
+      1630538,
+      "Bones Hyland",
+      "2026-27",
+      9.7,
+      2.9,
+      1.3,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12021"
+     ],
+     [
+      "22021"
+     ],
+     [
+      "42021"
+     ],
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "42023"
+     ],
+     [
+      "12024"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "12025"
+     ],
+     [
+      "22025"
+     ],
+     [
+      "42025"
+     ],
+     [
+      "12026"
+     ],
+     [
+      "22026"
+     ]
+    ]
+   }
+  ]
+ },
+ "1631108": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1631108
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG",
+     "SUPPLEMENTAL_STATUS"
+    ],
+    "rowSet": [
+     [
+      1631108,
+      "Max",
+      "Christie",
+      "Max Christie",
+      "Christie, Max",
+      "M. Christie",
+      "max-christie",
+      "2003-02-10T00:00:00",
+      "Michigan State",
+      "USA",
+      "Michigan State/USA",
+      "6-5",
+      "190",
+      4,
+      "0",
+      "Guard",
+      "Active",
+      "Y",
+      1610612742,
+      "Mavericks",
+      "DAL",
+      "mavericks",
+      "Dallas",
+      "max_christie",
+      2022,
+      2026,
+      "Y",
+      "Y",
+      "Y",
+      "2022",
+      "2",
+      "35",
+      "N",
+      0
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "PIE"
+    ],
+    "rowSet": [
+     [
+      1631108,
+      "Max Christie",
+      "2026-27",
+      5.4,
+      1.0,
+      2.7,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "42022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ],
+     [
+      "62023"
+     ],
+     [
+      "12024"
+     ],
+     [
+      "22024"
+     ],
+     [
+      "52024"
+     ],
+     [
+      "12025"
+     ],
+     [
+      "22025"
+     ],
+     [
+      "12026"
+     ],
+     [
+      "22026"
+     ]
+    ]
+   }
+  ]
+ },
+ "1631298": {
+  "resource": "commonplayerinfo",
+  "parameters": [
+   {
+    "PlayerID": 1631298
+   },
+   {
+    "LeagueID": "00"
+   }
+  ],
+  "resultSets": [
+   {
+    "name": "CommonPlayerInfo",
+    "headers": [
+     "PERSON_ID",
+     "FIRST_NAME",
+     "LAST_NAME",
+     "DISPLAY_FIRST_LAST",
+     "DISPLAY_LAST_COMMA_FIRST",
+     "DISPLAY_FI_LAST",
+     "PLAYER_SLUG",
+     "BIRTHDATE",
+     "SCHOOL",
+     "COUNTRY",
+     "LAST_AFFILIATION",
+     "HEIGHT",
+     "WEIGHT",
+     "SEASON_EXP",
+     "JERSEY",
+     "POSITION",
+     "ROSTERSTATUS",
+     "GAMES_PLAYED_CURRENT_SEASON_FLAG",
+     "TEAM_ID",
+     "TEAM_NAME",
+     "TEAM_ABBREVIATION",
+     "TEAM_CODE",
+     "TEAM_CITY",
+     "PLAYERCODE",
+     "FROM_YEAR",
+     "TO_YEAR",
+     "DLEAGUE_FLAG",
+     "NBA_FLAG",
+     "GAMES_PLAYED_FLAG",
+     "DRAFT_YEAR",
+     "DRAFT_ROUND",
+     "DRAFT_NUMBER",
+     "GREATEST_75_FLAG"
+    ],
+    "rowSet": [
+     [
+      1631298,
+      "Jack",
+      "White",
+      "Jack White",
+      "White, Jack",
+      "J. White",
+      "jack-white",
+      "1997-08-05T00:00:00",
+      "Duke",
+      "Australia",
+      "Duke/Australia",
+      "6-6",
+      "225",
+      2,
+      "",
+      "Forward",
+      "Inactive",
+      "N",
+      0,
+      "",
+      "",
+      "",
+      "",
+      "jack_white",
+      2022,
+      2023,
+      "Y",
+      "Y",
+      "Y",
+      "Undrafted",
+      "Undrafted",
+      "Undrafted",
+      "N"
+     ]
+    ]
+   },
+   {
+    "name": "PlayerHeadlineStats",
+    "headers": [
+     "PLAYER_ID",
+     "PLAYER_NAME",
+     "TimeFrame",
+     "PTS",
+     "AST",
+     "REB",
+     "ALL_STAR_APPEARANCES"
+    ],
+    "rowSet": [
+     [
+      1631298,
+      "Jack White",
+      "career",
+      1.3,
+      0.2,
+      1.4,
+      0
+     ]
+    ]
+   },
+   {
+    "name": "AvailableSeasons",
+    "headers": [
+     "SEASON_ID"
+    ],
+    "rowSet": [
+     [
+      "12022"
+     ],
+     [
+      "22022"
+     ],
+     [
+      "12023"
+     ],
+     [
+      "22023"
+     ]
+    ]
+   }
+  ]
  }
 }

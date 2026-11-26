@@ -6,7 +6,7 @@ import duckdb
 import pytest
 
 from hoopdata.ingest import ingest
-from hoopdata.source import PLAYER, ReplaySource
+from hoopdata.source import PLAYER, REGULAR_SEASON, ReplaySource
 from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -378,3 +378,74 @@ def test_team_game_stats_calculates_per_game_percentages(db):
 
     assert fg_pct == pytest.approx(39 / 73)
     assert ft_pct == pytest.approx(25 / 32)
+
+
+class BackfillSource(ReplaySource):
+    """Replay source that logs which seasons it was asked for and stands in 2022-23 for seasons without fixtures."""
+
+    def __init__(self, fixtures_dir):
+        super().__init__(fixtures_dir)
+        self.seasons_requested = []
+
+    def game_log(self, season, season_type, kind):
+        if season_type == REGULAR_SEASON and kind == PLAYER:
+            self.seasons_requested.append(season)
+        if season not in ("2022-23", "2023-24"):
+            season = "2022-23"
+        return super().game_log(season, season_type, kind)
+
+
+ALL_SEASONS_TO_2023_24 = [
+    "1996-97", "1997-98", "1998-99", "1999-00", "2000-01", "2001-02", "2002-03",
+    "2003-04", "2004-05", "2005-06", "2006-07", "2007-08", "2008-09", "2009-10",
+    "2010-11", "2011-12", "2012-13", "2013-14", "2014-15", "2015-16", "2016-17",
+    "2017-18", "2018-19", "2019-20", "2020-21", "2021-22", "2022-23", "2023-24",
+]
+
+
+def test_all_seasons_run_covers_1996_97_through_the_latest_season(tmp_path):
+    source = BackfillSource(FIXTURES)
+
+    ingest(source, Store(tmp_path), today=date(2024, 11, 26))
+
+    assert source.seasons_requested == ALL_SEASONS_TO_2023_24 + ["2024-25"]
+
+
+def test_in_summer_only_the_season_that_just_ended_is_refetched(tmp_path):
+    store = Store(tmp_path)
+    backfill = BackfillSource(FIXTURES)
+    ingest(backfill, store, today=date(2024, 7, 1))
+
+    nightly = BackfillSource(FIXTURES)
+    ingest(nightly, store, today=date(2024, 7, 2))
+
+    assert backfill.seasons_requested == ALL_SEASONS_TO_2023_24
+    assert nightly.seasons_requested == ["2023-24"]
+
+
+def test_all_seasons_run_fetches_older_seasons_that_are_missing(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"])
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, today=date(2024, 7, 1))
+
+    assert source.seasons_requested == ALL_SEASONS_TO_2023_24[:-2] + ["2023-24"]
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        seasons = con.execute("select count(distinct season) from player_box_scores").fetchone()[0]
+    assert seasons == len(ALL_SEASONS_TO_2023_24)
+
+
+def test_passing_a_completed_season_refetches_it(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    assert source.seasons_requested == ["2022-23"]
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        rows = con.execute(
+            "select season_type, count(*) from player_box_scores group by season_type order by season_type"
+        ).fetchall()
+    assert rows == [("Playoffs", 16), ("Regular Season", 27)]
