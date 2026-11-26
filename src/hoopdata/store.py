@@ -62,18 +62,20 @@ class Store:
         ``season`` lives in the hive folder name, so it is left out of the file.
         """
         folder = self.root / table / f"season={season}"
-        folder.mkdir(parents=True, exist_ok=True)
         path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
-        temp = path.with_name(path.name + ".tmp")
+        _write_parquet(df.drop(columns="season"), path)
 
-        data = df.drop(columns="season")
-        try:
-            with duckdb.connect() as con:
-                con.register("data", data)
-                con.execute(f"copy data to '{_sql_path(temp)}' (format parquet)")
-            os.replace(temp, path)
-        finally:
-            temp.unlink(missing_ok=True)
+    def write_table(self, table, df):
+        """Atomically write a whole unpartitioned table as one Parquet file."""
+        _write_parquet(df, self.root / f"{table}.parquet")
+
+    def read_table(self, table):
+        """Read an unpartitioned table, or ``None`` if it hasn't been written yet."""
+        path = self.root / f"{table}.parquet"
+        if not path.exists():
+            return None
+        with duckdb.connect() as con:
+            return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
 
     def publish(self):
         """Build the views-only DuckDB file that consumers open read-only.
@@ -102,6 +104,18 @@ def _write_atomically(path, text):
     temp = path.with_name(path.name + ".tmp")
     temp.write_text(text, encoding="utf-8")
     os.replace(temp, path)
+
+
+def _write_parquet(df, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    try:
+        with duckdb.connect() as con:
+            con.register("data", df)
+            con.execute(f"copy data to '{_sql_path(temp)}' (format parquet)")
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def _sql_path(path):

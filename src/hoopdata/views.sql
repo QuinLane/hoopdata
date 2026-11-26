@@ -20,6 +20,17 @@ from read_parquet(
     hive_types = {'season': varchar}
 );
 
+create view players as
+select
+    player_id, first_name, last_name, display_name, birthdate,
+    height_in, weight_lb, position, country, school,
+    draft_year, draft_round, draft_number, from_year, to_year
+from read_parquet('{root}/players.parquet');
+
+create view teams as
+select team_id, abbreviation, city, nickname, full_name, year_founded
+from read_parquet('{root}/teams.parquet');
+
 create view player_game_stats as
 select
     *,

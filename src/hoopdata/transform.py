@@ -13,6 +13,12 @@ PLAYER_BOX_SCORE_COLUMNS = [
     "wl", *STAT_COLUMNS,
 ]
 
+PLAYER_COLUMNS = [
+    "player_id", "first_name", "last_name", "display_name", "birthdate",
+    "height_in", "weight_lb", "position", "country", "school",
+    "draft_year", "draft_round", "draft_number", "from_year", "to_year",
+]
+
 
 TEAM_BOX_SCORE_COLUMNS = [
     column for column in PLAYER_BOX_SCORE_COLUMNS if column not in ("player_id", "player_name")
@@ -59,6 +65,44 @@ def _box_scores(df, season, season_type, columns):
         if column in columns:
             df[column] = df[column].astype("Int64")
     return df
+
+
+def players(all_players, player_infos):
+    """Join new players' rows from the all-players list with their player info."""
+    listed = _result_set(all_players)[["person_id", "display_first_last", "from_year", "to_year"]]
+    info = pd.concat([_result_set(raw) for raw in player_infos], ignore_index=True)
+    info = info.drop(columns=["display_first_last", "from_year", "to_year"])
+    df = info.merge(listed, on="person_id")
+    df = df.rename(columns={
+        "person_id": "player_id", "display_first_last": "display_name",
+        "height": "height_in", "weight": "weight_lb",
+    })
+    df = df[PLAYER_COLUMNS].replace({"": None, "Undrafted": None})
+
+    for column in ["first_name", "last_name", "display_name", "position", "country", "school"]:
+        df[column] = df[column].astype("string")
+    df["birthdate"] = pd.to_datetime(df["birthdate"]).dt.date
+    df["height_in"] = df["height_in"].map(_feet_inches_to_inches, na_action="ignore")
+    for column in ["player_id", "height_in", "weight_lb", "draft_year", "draft_round",
+                   "draft_number", "from_year", "to_year"]:
+        df[column] = pd.to_numeric(df[column]).astype("Int64")
+    return df
+
+
+def teams(static_teams):
+    """Current team identities from nba_api's bundled static team list."""
+    df = pd.DataFrame(static_teams).rename(columns={"id": "team_id"})
+    df = df[["team_id", "abbreviation", "city", "nickname", "full_name", "year_founded"]]
+    for column in ["abbreviation", "city", "nickname", "full_name"]:
+        df[column] = df[column].astype("string")
+    for column in ["team_id", "year_founded"]:
+        df[column] = df[column].astype("Int64")
+    return df
+
+
+def _feet_inches_to_inches(height):
+    feet, inches = height.split("-")
+    return int(feet) * 12 + int(inches)
 
 
 def _result_set(raw):

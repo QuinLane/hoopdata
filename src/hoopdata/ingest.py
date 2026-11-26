@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
 
+import pandas as pd
+from nba_api.stats.static import teams as static_teams
+
 from hoopdata import transform
 from hoopdata.source import PLAYER, SEASON_TYPES, TEAM
 from hoopdata.store import SUCCEEDED
@@ -7,6 +10,8 @@ from hoopdata.store import SUCCEEDED
 PLAYER_BOX_SCORES = "player_box_scores"
 TEAM_BOX_SCORES = "team_box_scores"
 GAMES = "games"
+PLAYERS = "players"
+TEAMS = "teams"
 
 
 @dataclass
@@ -23,14 +28,16 @@ class Report:
 
 
 def ingest(source, store, seasons):
-    """Fetch each season's player and team box scores, store them, and publish the views."""
+    """Fetch each season's player and team box scores, bios for new players and the team list, and publish the views."""
     report = Report()
+    player_ids = set()
     for season in seasons:
         for season_type in SEASON_TYPES:
             players = transform.player_box_scores(source.game_log(season, season_type, PLAYER), season, season_type)
             store.write_partition(PLAYER_BOX_SCORES, season, season_type, players)
             store.record_item(PLAYER_BOX_SCORES, season, season_type, SUCCEEDED, rows=len(players))
             report.items.append(Item(PLAYER_BOX_SCORES, season, season_type, len(players)))
+            player_ids.update(players["player_id"])
 
             team_log = source.game_log(season, season_type, TEAM)
             teams = transform.team_box_scores(team_log, season, season_type)
@@ -42,5 +49,18 @@ def ingest(source, store, seasons):
             store.write_partition(GAMES, season, season_type, games)
             store.record_item(GAMES, season, season_type, SUCCEEDED, rows=len(games))
             report.items.append(Item(GAMES, season, season_type, len(games)))
+    _add_new_players(source, store, player_ids)
+    store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
     store.publish()
     return report
+
+
+def _add_new_players(source, store, player_ids):
+    """Fetch bios only for players not yet stored. Existing bios are never refreshed."""
+    stored = store.read_table(PLAYERS)
+    new_ids = sorted(player_ids - set(stored["player_id"] if stored is not None else []))
+    if not new_ids:
+        return
+    infos = [source.player_info(player_id) for player_id in new_ids]
+    new = transform.players(source.all_players(), infos)
+    store.write_table(PLAYERS, pd.concat([stored, new]) if stored is not None else new)

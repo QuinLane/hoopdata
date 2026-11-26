@@ -6,7 +6,7 @@ import duckdb
 import pytest
 
 from hoopdata.ingest import ingest
-from hoopdata.source import ReplaySource
+from hoopdata.source import PLAYER, ReplaySource
 from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -19,6 +19,7 @@ LAKERS = 1610612747
 SIAKAM = 1627783
 RAPTORS = 1610612761
 PACERS = 1610612754
+AUSTIN_REAVES = 1630559  # undrafted
 NUGGETS = 1610612743
 
 
@@ -29,6 +30,27 @@ def db(tmp_path):
     con = duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True)
     yield con
     con.close()
+
+
+class CountingSource(ReplaySource):
+    """Replay source that counts player-info requests and can leave players out of the box scores."""
+
+    def __init__(self, fixtures_dir, hidden_player_ids=()):
+        super().__init__(fixtures_dir)
+        self.hidden_player_ids = set(hidden_player_ids)
+        self.player_info_requests = []
+
+    def game_log(self, season, season_type, kind):
+        raw = super().game_log(season, season_type, kind)
+        result = raw["resultSets"][0]
+        if kind == PLAYER:
+            player_id = result["headers"].index("PLAYER_ID")
+            result["rowSet"] = [row for row in result["rowSet"] if row[player_id] not in self.hidden_player_ids]
+        return raw
+
+    def player_info(self, player_id):
+        self.player_info_requests.append(player_id)
+        return super().player_info(player_id)
 
 
 def test_season_shooting_percentage_comes_from_summed_makes_and_attempts(db):
@@ -162,6 +184,62 @@ def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
 
     assert rows == 64 + 19
     assert not list(tmp_path.rglob("*.tmp"))
+
+
+def test_players_hold_bios_with_height_in_inches(db):
+    row = db.execute(
+        """
+        select first_name, last_name, display_name, birthdate, height_in, weight_lb, position,
+               country, school, draft_year, draft_round, draft_number, from_year, to_year
+        from players where player_id = ?
+        """,
+        [JOKIC],
+    ).fetchone()
+
+    assert row == (
+        "Nikola", "Jokić", "Nikola Jokić", date(1995, 2, 19), 6 * 12 + 11, 284, "Center",
+        "Serbia", "Mega Basket", 2014, 2, 41, 2015, 2026,
+    )
+
+
+def test_undrafted_players_have_empty_draft_fields_and_drafted_ones_keep_integers(db):
+    undrafted = db.execute(
+        "select draft_year, draft_round, draft_number from players where player_id = ?", [AUSTIN_REAVES]
+    ).fetchone()
+    draft_number_type = db.execute(
+        "select column_type from (describe players) where column_name = 'draft_number'"
+    ).fetchone()[0]
+
+    assert undrafted == (None, None, None)
+    assert draft_number_type == "BIGINT"
+
+
+def test_player_bios_are_fetched_only_for_players_not_yet_stored(tmp_path):
+    store = Store(tmp_path)
+    ingest(CountingSource(FIXTURES, hidden_player_ids=[JOKIC]), store, seasons=["2023-24"])
+
+    unchanged = CountingSource(FIXTURES, hidden_player_ids=[JOKIC])
+    ingest(unchanged, store, seasons=["2023-24"])
+    with_jokic = CountingSource(FIXTURES)
+    ingest(with_jokic, store, seasons=["2023-24"])
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        players = con.execute("select count(*), count(distinct player_id) from players").fetchone()
+
+    assert unchanged.player_info_requests == []
+    assert with_jokic.player_info_requests == [JOKIC]
+    assert players == (52, 52)
+
+
+def test_teams_hold_current_identities(db):
+    row = db.execute(
+        "select abbreviation, city, nickname, full_name, year_founded from teams where team_id = ?",
+        [NUGGETS],
+    ).fetchone()
+    teams = db.execute("select count(*) from teams").fetchone()[0]
+
+    assert row == ("DEN", "Denver", "Nuggets", "Denver Nuggets", 1976)
+    assert teams == 30
 
 
 def test_manifest_records_each_item_and_the_schema_version(tmp_path):
