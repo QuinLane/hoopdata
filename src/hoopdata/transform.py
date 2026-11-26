@@ -13,15 +13,23 @@ PLAYER_BOX_SCORE_COLUMNS = [
     "wl", *STAT_COLUMNS,
 ]
 
+TEAM_BOX_SCORE_COLUMNS = [
+    column for column in PLAYER_BOX_SCORE_COLUMNS if column not in ("player_id", "player_name")
+]
+
+# Every box score column's type. game_date becomes a plain date afterwards.
+BOX_SCORE_TYPES = {
+    **dict.fromkeys(
+        ["season", "season_type", "game_id", "player_name", "team_abbreviation", "team_name", "wl"], "string"
+    ),
+    "game_date": "datetime64[ns]",
+    **dict.fromkeys(["player_id", "team_id", *STAT_COLUMNS], "Int64"),
+}
+
 PLAYER_COLUMNS = [
     "player_id", "first_name", "last_name", "display_name", "birthdate",
     "height_in", "weight_lb", "position", "country", "school",
     "draft_year", "draft_round", "draft_number", "from_year", "to_year",
-]
-
-
-TEAM_BOX_SCORE_COLUMNS = [
-    column for column in PLAYER_BOX_SCORE_COLUMNS if column not in ("player_id", "player_name")
 ]
 
 
@@ -54,16 +62,8 @@ def games(raw, season, season_type):
 def _box_scores(df, season, season_type, columns):
     df["season"] = season
     df["season_type"] = season_type
-    df = df[columns]
-
-    for column in ["season", "season_type", "game_id", "player_name",
-                   "team_abbreviation", "team_name", "wl"]:
-        if column in columns:
-            df[column] = df[column].astype("string")
-    df["game_date"] = pd.to_datetime(df["game_date"]).dt.date
-    for column in ["player_id", "team_id", *STAT_COLUMNS]:
-        if column in columns:
-            df[column] = df[column].astype("Int64")
+    df = df[columns].astype({column: BOX_SCORE_TYPES[column] for column in columns})
+    df["game_date"] = df["game_date"].dt.date
     return df
 
 
@@ -89,9 +89,9 @@ def players(all_players, player_infos):
     return df
 
 
-def teams(static_teams):
+def teams(team_list):
     """Current team identities from nba_api's bundled static team list."""
-    df = pd.DataFrame(static_teams).rename(columns={"id": "team_id"})
+    df = pd.DataFrame(team_list).rename(columns={"id": "team_id"})
     df = df[["team_id", "abbreviation", "city", "nickname", "full_name", "year_founded"]]
     for column in ["abbreviation", "city", "nickname", "full_name"]:
         df[column] = df[column].astype("string")
