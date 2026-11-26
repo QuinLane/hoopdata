@@ -1,3 +1,5 @@
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import duckdb
@@ -107,3 +109,66 @@ def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
 
     assert rows == 59 + 19
     assert not list(tmp_path.rglob("*.tmp"))
+
+
+def test_manifest_records_each_item_and_the_schema_version(tmp_path):
+    before = datetime.now(timezone.utc)
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2023-24"])
+    after = datetime.now(timezone.utc)
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+
+    assert manifest["schema_version"] == 1
+    assert before <= datetime.fromisoformat(manifest["last_updated"]) <= after
+    items = {(i["table"], i["season"], i["season_type"]): i for i in manifest["items"]}
+    assert set(items) == {
+        ("player_box_scores", "2023-24", "Regular Season"),
+        ("player_box_scores", "2023-24", "Playoffs"),
+    }
+    regular = items[("player_box_scores", "2023-24", "Regular Season")]
+    assert regular["status"] == "succeeded"
+    assert regular["rows"] == 59
+    assert regular["error"] is None
+    assert before <= datetime.fromisoformat(regular["fetched_at"]) <= after
+    assert items[("player_box_scores", "2023-24", "Playoffs")]["rows"] == 19
+
+
+def test_hoopdata_info_reports_the_manifest_schema_version_and_last_updated(db, tmp_path):
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+
+    schema_version, last_updated = db.execute(
+        "select schema_version, last_updated from hoopdata_info"
+    ).fetchone()
+
+    assert schema_version == 1
+    assert last_updated == datetime.fromisoformat(manifest["last_updated"])
+
+
+def test_later_ingest_updates_hoopdata_info_without_rebuilding_the_file(tmp_path):
+    store = Store(tmp_path)
+    database = tmp_path / "hoopdata.duckdb"
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+    with duckdb.connect(str(database), read_only=True) as con:
+        first = con.execute("select last_updated from hoopdata_info").fetchone()[0]
+    built = database.stat().st_mtime_ns
+
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+    with duckdb.connect(str(database), read_only=True) as con:
+        second = con.execute("select last_updated from hoopdata_info").fetchone()[0]
+
+    assert second > first
+    assert database.stat().st_mtime_ns == built
+
+
+def test_ingest_after_the_data_root_moves_rebuilds_the_file(tmp_path):
+    ingest(ReplaySource(FIXTURES), Store(tmp_path / "old"), seasons=["2023-24"])
+    (tmp_path / "old").rename(tmp_path / "new")
+
+    ingest(ReplaySource(FIXTURES), Store(tmp_path / "new"), seasons=["2023-24"])
+
+    with duckdb.connect(str(tmp_path / "new" / "hoopdata.duckdb"), read_only=True) as con:
+        rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
+        schema_version = con.execute("select schema_version from hoopdata_info").fetchone()[0]
+
+    assert rows == 59 + 19
+    assert schema_version == 1
