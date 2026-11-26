@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import duckdb
@@ -9,6 +10,11 @@ from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
 JOKIC = 203999
+PELICANS = 1610612740
+MAVERICKS = 1610612742
+DENVER = 1610612743
+CLIPPERS = 1610612746
+LAKERS = 1610612747
 
 
 @pytest.fixture
@@ -107,3 +113,74 @@ def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
 
     assert rows == 59 + 19
     assert not list(tmp_path.rglob("*.tmp"))
+
+
+def test_standings_count_wins_and_losses_per_season_type(db):
+    # Fixture games: DEN beat DAL and LAC at home, lost at NOP, then beat LAL in the playoffs.
+    rows = db.execute(
+        """
+        select season_type, team_id, wins, losses from standings
+        where season = '2023-24' order by season_type, team_id
+        """
+    ).fetchall()
+
+    assert rows == [
+        ("Playoffs", DENVER, 1, 0),
+        ("Playoffs", LAKERS, 0, 1),
+        ("Regular Season", PELICANS, 1, 0),
+        ("Regular Season", MAVERICKS, 0, 1),
+        ("Regular Season", DENVER, 2, 1),
+        ("Regular Season", CLIPPERS, 0, 1),
+    ]
+
+
+def test_games_have_one_row_each_with_home_and_away_from_the_matchup(db):
+    rows = db.execute(
+        """
+        select game_id, season, season_type, game_date, home_team_id, away_team_id, home_pts, away_pts
+        from games order by game_id
+        """
+    ).fetchall()
+
+    assert rows == [
+        ("0022300006", "2023-24", "Regular Season", date(2023, 11, 3), DENVER, MAVERICKS, 125, 114),
+        ("0022300024", "2023-24", "Regular Season", date(2023, 11, 14), DENVER, CLIPPERS, 111, 108),
+        ("0022300034", "2023-24", "Regular Season", date(2023, 11, 17), PELICANS, DENVER, 115, 110),
+        ("0042300151", "2023-24", "Playoffs", date(2024, 4, 20), DENVER, LAKERS, 114, 103),
+    ]
+
+
+def test_team_box_scores_are_player_box_scores_without_the_player_fields(db):
+    player_columns = [row[0] for row in db.execute("select column_name from (describe player_box_scores)").fetchall()]
+    team_columns = [row[0] for row in db.execute("select column_name from (describe team_box_scores)").fetchall()]
+
+    assert team_columns == [c for c in player_columns if c not in ("player_id", "player_name")]
+    assert db.execute(
+        "select team_abbreviation, team_name from team_box_scores where team_id = ? and game_id = '0022300006'",
+        [MAVERICKS],
+    ).fetchone() == ("DAL", "Dallas Mavericks")
+
+
+def test_team_season_percentages_come_from_summed_makes_and_attempts(db):
+    # Denver, 3 regular season games: 49/93, 39/73, 47/96. Summed: 135/262.
+    games, pts, fg_pct = db.execute(
+        """
+        select games_played, pts, fg_pct from team_season_averages
+        where team_id = ? and season = '2023-24' and season_type = 'Regular Season'
+        """,
+        [DENVER],
+    ).fetchone()
+
+    assert games == 3
+    assert pts == pytest.approx((125 + 111 + 110) / 3)
+    assert fg_pct == pytest.approx(135 / 262)
+
+
+def test_team_game_stats_calculates_per_game_percentages(db):
+    fg_pct, ft_pct = db.execute(
+        "select fg_pct, ft_pct from team_game_stats where team_id = ? and game_id = '0022300024'",
+        [DENVER],
+    ).fetchone()
+
+    assert fg_pct == pytest.approx(39 / 73)
+    assert ft_pct == pytest.approx(25 / 32)
