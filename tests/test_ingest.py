@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import duckdb
@@ -9,6 +10,10 @@ from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
 JOKIC = 203999
+SIAKAM = 1627783
+RAPTORS = 1610612761
+PACERS = 1610612754
+NUGGETS = 1610612743
 
 
 @pytest.fixture
@@ -81,6 +86,50 @@ def test_player_game_stats_calculates_per_game_percentages(db):
     assert ft_pct == 1.0
 
 
+def test_player_teams_shows_a_mid_season_trade_as_one_row_per_team(db):
+    # Siakam was traded from Toronto to Indiana in January 2024.
+    rows = db.execute(
+        """
+        select team_id, team_abbreviation, games_played, first_game_date, last_game_date
+        from player_teams
+        where player_id = ? and season = '2023-24' and season_type = 'Regular Season'
+        order by first_game_date
+        """,
+        [SIAKAM],
+    ).fetchall()
+
+    assert rows == [
+        (RAPTORS, "TOR", 2, date(2024, 1, 12), date(2024, 1, 15)),
+        (PACERS, "IND", 3, date(2024, 1, 19), date(2024, 1, 23)),
+    ]
+
+
+def test_team_rosters_lists_players_who_appeared_with_games_played(db):
+    rows = db.execute(
+        """
+        select player_name, games_played from team_rosters
+        where team_id = ? and season = '2023-24' and season_type = 'Regular Season'
+        order by player_name
+        """,
+        [NUGGETS],
+    ).fetchall()
+
+    assert rows == [
+        ("Aaron Gordon", 3),
+        ("Christian Braun", 3),
+        ("Jalen Pickett", 2),
+        ("Jamal Murray", 1),
+        ("Julian Strawther", 1),
+        ("Justin Holiday", 1),
+        ("Kentavious Caldwell-Pope", 3),
+        ("Michael Porter Jr.", 3),
+        ("Nikola Jokić", 3),
+        ("Peyton Watson", 3),
+        ("Reggie Jackson", 3),
+        ("Zeke Nnaji", 3),
+    ]
+
+
 def test_published_file_holds_only_views_that_work_from_any_directory(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     ingest(ReplaySource(FIXTURES), Store("data"), seasons=["2023-24"])
@@ -94,7 +143,7 @@ def test_published_file_holds_only_views_that_work_from_any_directory(tmp_path, 
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
 
     assert table_types == {"VIEW"}
-    assert rows == 59 + 19
+    assert rows == 64 + 19
 
 
 def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
@@ -105,5 +154,5 @@ def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
 
-    assert rows == 59 + 19
+    assert rows == 64 + 19
     assert not list(tmp_path.rglob("*.tmp"))
