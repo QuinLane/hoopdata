@@ -184,7 +184,7 @@ def test_manifest_records_each_item_and_the_schema_version(tmp_path):
     }
     regular = items[("player_box_scores", "2023-24", "Regular Season")]
     assert regular["status"] == "succeeded"
-    assert regular["rows"] == 59
+    assert regular["rows"] == 64
     assert regular["error"] is None
     assert before <= datetime.fromisoformat(regular["fetched_at"]) <= after
     assert items[("player_box_scores", "2023-24", "Playoffs")]["rows"] == 19
@@ -227,7 +227,7 @@ def test_ingest_after_the_data_root_moves_rebuilds_the_file(tmp_path):
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
         schema_version = con.execute("select schema_version from hoopdata_info").fetchone()[0]
 
-    assert rows == 59 + 19
+    assert rows == 64 + 19
     assert schema_version == 1
 
 
