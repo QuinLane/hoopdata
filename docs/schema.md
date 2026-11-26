@@ -49,6 +49,37 @@ One row per player per game. Source: the stats.nba.com league game log (players)
 
 Not stored from the source: per-game percentages, fantasy points, video-available and the matchup text.
 
+### `players`
+
+One row per player who appears in a box score. Bio only; stats live in the box scores. Source: the stats.nba.com all-players list (name and career span) joined with each player's info (the rest). Stored as one Parquet file, `players.parquet`. Bios are fetched only for players not yet stored, and are never refreshed.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `player_id` | BIGINT | NBA player ID |
+| `first_name`, `last_name` | VARCHAR | First and last name |
+| `display_name` | VARCHAR | Full name as NBA displays it |
+| `birthdate` | DATE | Date of birth |
+| `height_in` | BIGINT | Height in inches (`6-11` becomes `83`) |
+| `weight_lb` | BIGINT | Weight in pounds |
+| `position` | VARCHAR | Position, like `Center` or `Forward-Guard` |
+| `country` | VARCHAR | Country |
+| `school` | VARCHAR | College, or last team before the NBA |
+| `draft_year`, `draft_round`, `draft_number` | BIGINT | Draft year, round and pick; `NULL` for undrafted players |
+| `from_year`, `to_year` | BIGINT | First and last NBA season, by starting year |
+
+### `teams`
+
+One row per current NBA team. Current identity only; historical names live on the box score rows. Source: `nba_api`'s bundled static team list. Stored as one Parquet file, `teams.parquet`, rewritten on every ingest.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `team_id` | BIGINT | NBA team ID |
+| `abbreviation` | VARCHAR | Current abbreviation, like `OKC` |
+| `city` | VARCHAR | Current city |
+| `nickname` | VARCHAR | Current nickname, like `Thunder` |
+| `full_name` | VARCHAR | City and nickname |
+| `year_founded` | BIGINT | Year the franchise was founded |
+
 ## Views
 
 ### `player_game_stats`
