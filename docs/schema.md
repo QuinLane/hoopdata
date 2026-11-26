@@ -220,7 +220,7 @@ select schema_version, last_updated from hoopdata_info
 
 - **`schema_version`**: the version of this schema.
 - **`last_updated`**: UTC time the latest item was recorded.
-- **`items`**: one entry per table, season and season type, holding the outcome of its latest fetch: `status`, `fetched_at` (UTC), `rows` and `error` (`null` when it succeeded).
+- **`items`**: one entry per table, season and season type, holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
 - **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
 
 ## When `hoopdata.duckdb` is rebuilt

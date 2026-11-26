@@ -1,4 +1,5 @@
 import json
+import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import duckdb
 import pytest
 
 from hoopdata.ingest import ingest
-from hoopdata.source import PLAYER, ReplaySource
+from hoopdata.source import PLAYER, PLAYOFFS, ReplaySource
 from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -51,6 +52,95 @@ class CountingSource(ReplaySource):
     def player_info(self, player_id):
         self.player_info_requests.append(player_id)
         return super().player_info(player_id)
+
+
+class FailingSource(ReplaySource):
+    """Replay source that fails the given (season_type, kind) game logs and records every game-log request."""
+
+    def __init__(self, fixtures_dir, failing=()):
+        super().__init__(fixtures_dir)
+        self.failing = set(failing)
+        self.game_log_requests = []
+
+    def game_log(self, season, season_type, kind):
+        self.game_log_requests.append((season, season_type, kind))
+        if (season_type, kind) in self.failing:
+            raise ConnectionError("stats.nba.com timed out")
+        return super().game_log(season, season_type, kind)
+
+
+def manifest_items(data_root):
+    manifest = json.loads((Path(data_root) / "manifest.json").read_text(encoding="utf-8"))
+    return {(i["table"], i["season"], i["season_type"]): i for i in manifest["items"]}
+
+
+def test_a_failed_item_is_recorded_and_the_other_items_complete(tmp_path):
+    report = ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), Store(tmp_path), seasons=["2023-24"])
+
+    failed = manifest_items(tmp_path)[("player_box_scores", "2023-24", "Playoffs")]
+    assert failed["status"] == "failed"
+    assert failed["error"] == "ConnectionError: stats.nba.com timed out"
+    assert failed["rows"] is None
+    assert [(i.table, i.season_type, i.status) for i in report.items if i.status != "succeeded"] == [
+        ("player_box_scores", "Playoffs", "failed")
+    ]
+    assert len(report.items) == 6
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
+        games = con.execute("select count(*) from games").fetchone()[0]
+    assert player_rows == 64
+    assert games == 4
+
+
+def test_a_second_run_retries_only_the_failed_item(tmp_path):
+    store = Store(tmp_path)
+    ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), store, seasons=["2023-24"])
+
+    retry = FailingSource(FIXTURES)
+    report = ingest(retry, store, seasons=["2023-24"])
+
+    assert retry.game_log_requests == [("2023-24", "Playoffs", "player")]
+    assert [(i.table, i.season_type, i.status) for i in report.items] == [
+        ("player_box_scores", "Playoffs", "succeeded")
+    ]
+    assert {i["status"] for i in manifest_items(tmp_path).values()} == {"succeeded"}
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
+    assert player_rows == 64 + 19
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="only Windows refuses to replace a file that is open")
+def test_a_parquet_file_held_open_by_a_consumer_fails_its_item_and_leaves_no_partial_file(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+    ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), store, seasons=["2023-24"])
+
+    held = tmp_path / "player_box_scores" / "season=2023-24" / "playoffs.parquet"
+    with open(held, "rb"):
+        report = ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+
+    assert [(i.table, i.season_type, i.status) for i in report.items] == [
+        ("player_box_scores", "Playoffs", "failed")
+    ]
+    assert manifest_items(tmp_path)[("player_box_scores", "2023-24", "Playoffs")]["error"].startswith(
+        "PermissionError"
+    )
+    assert not list(tmp_path.rglob("*.tmp"))
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
+    assert player_rows == 64 + 19
+
+
+def test_each_run_writes_its_own_log_file(tmp_path):
+    store = Store(tmp_path)
+    first = ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), store, seasons=["2023-24"])
+    second = ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+
+    assert first.log_path != second.log_path
+    first_log = first.log_path.read_text(encoding="utf-8")
+    assert "player_box_scores 2023-24 Playoffs failed" in first_log
+    assert "ConnectionError: stats.nba.com timed out" in first_log
+    assert "player_box_scores 2023-24 Playoffs succeeded: 19 rows" in second.log_path.read_text(encoding="utf-8")
 
 
 def test_season_shooting_percentage_comes_from_summed_makes_and_attempts(db):

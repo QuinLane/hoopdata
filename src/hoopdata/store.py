@@ -11,11 +11,13 @@ import duckdb
 
 DATABASE_NAME = "hoopdata.duckdb"
 MANIFEST_NAME = "manifest.json"
+LOGS_FOLDER = "logs"
 
 # Bump on any breaking schema change: a column renamed or removed, or its meaning changed.
 SCHEMA_VERSION = 1
 
 SUCCEEDED = "succeeded"
+FAILED = "failed"
 
 
 class Store:
@@ -29,6 +31,13 @@ class Store:
     @property
     def manifest_path(self):
         return self.root / MANIFEST_NAME
+
+    def new_log_path(self):
+        """A fresh log file path for one run, named by its start time."""
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        path = self.root / LOGS_FOLDER / f"ingest-{stamp}.log"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
 
     def read_manifest(self):
         """The manifest as a dict, or an empty one if nothing has been recorded yet."""

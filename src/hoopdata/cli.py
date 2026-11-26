@@ -23,8 +23,10 @@ def main(argv=None, source=None):
     data_root = args.data_root or os.environ.get("NBA_DATA_ROOT") or DEFAULT_DATA_ROOT
     report = ingest(source or NbaApiSource(), Store(data_root), seasons=[args.season])
     for item in report.items:
-        print(f"{item.table} {item.season} {item.season_type}: {item.rows} rows")
-    return 0
+        outcome = f"FAILED ({item.error})" if item.error else f"{item.rows} rows"
+        print(f"{item.table} {item.season} {item.season_type}: {outcome}")
+    print(f"{len(report.failed)} of {len(report.items)} items failed. Log: {report.log_path}")
+    return 1 if report.failed else 0
 
 
 if __name__ == "__main__":
