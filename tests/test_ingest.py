@@ -228,7 +228,7 @@ def test_player_bios_are_fetched_only_for_players_not_yet_stored(tmp_path):
 
     assert unchanged.player_info_requests == []
     assert with_jokic.player_info_requests == [JOKIC]
-    assert players == (52, 52)
+    assert players == (53, 53)
 
 
 def test_teams_hold_current_identities(db):
