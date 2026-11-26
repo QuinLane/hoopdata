@@ -129,6 +129,10 @@ def test_manifest_records_each_item_and_the_schema_version(tmp_path):
     assert set(items) == {
         ("player_box_scores", "2023-24", "Regular Season"),
         ("player_box_scores", "2023-24", "Playoffs"),
+        ("team_box_scores", "2023-24", "Regular Season"),
+        ("team_box_scores", "2023-24", "Playoffs"),
+        ("games", "2023-24", "Regular Season"),
+        ("games", "2023-24", "Playoffs"),
     }
     regular = items[("player_box_scores", "2023-24", "Regular Season")]
     assert regular["status"] == "succeeded"
