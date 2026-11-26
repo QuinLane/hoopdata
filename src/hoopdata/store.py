@@ -45,6 +45,14 @@ class Store:
             return {"schema_version": SCHEMA_VERSION, "last_updated": None, "items": []}
         return json.loads(self.manifest_path.read_text(encoding="utf-8"))
 
+    def succeeded_items(self, season):
+        """The ``(table, season_type)`` items of ``season`` whose latest fetch succeeded."""
+        return {
+            (i["table"], i["season_type"])
+            for i in self.read_manifest()["items"]
+            if i["season"] == season and i["status"] == SUCCEEDED
+        }
+
     def record_item(self, table, season, season_type, status, rows=None, error=None):
         """Record one item's outcome in the manifest and bump the last-updated time."""
         now = datetime.now(timezone.utc).isoformat()
@@ -85,6 +93,14 @@ class Store:
             return None
         with duckdb.connect() as con:
             return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
+
+    def distinct_values(self, table, column):
+        """The distinct values of ``column`` across every partition of ``table``, empty if none are written."""
+        if not list((self.root / table).glob("*/*.parquet")):
+            return set()
+        with duckdb.connect() as con:
+            pattern = _sql_path(self.root / table / "*" / "*.parquet")
+            return {row[0] for row in con.execute(f"select distinct {column} from read_parquet('{pattern}')").fetchall()}
 
     def publish(self):
         """Build the views-only DuckDB file that consumers open read-only.

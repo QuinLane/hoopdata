@@ -74,7 +74,7 @@ One row per game. Derived from the team game log with no extra requests: the tea
 
 ### `players`
 
-One row per player who appears in a box score. Bio only; stats live in the box scores. Source: the stats.nba.com all-players list (name and career span) joined with each player's info (the rest). Stored as one Parquet file, `players.parquet`. Bios are fetched only for players not yet stored, and are never refreshed.
+One row per player who appears in a box score. Bio only; stats live in the box scores. Source: the stats.nba.com all-players list (name and career span) joined with each player's info (the rest). Stored as one Parquet file, `players.parquet`. Bios are fetched only for players not yet stored, and are never refreshed. Each run fetches a bio for every player in the stored box scores who has none, so bios missed by a failure or a crash are caught up on the next run.
 
 | Column | Type | Meaning |
 |---|---|---|

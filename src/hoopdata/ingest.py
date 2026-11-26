@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -17,6 +18,9 @@ PLAYERS = "players"
 TEAMS = "teams"
 
 FIRST_SEASON_START_YEAR = 1996
+
+# Bios are written to players.parquet after every this many players.
+BIOS_PER_WRITE = 20
 
 log = logging.getLogger(__name__)
 
@@ -57,72 +61,76 @@ def ingest(source, store, seasons=None, today=None):
     """Fetch each season's player and team box scores, bios for new players and the team list, and publish the views.
 
     A failed item (table + season + season type) is recorded and skipped, and the run continues.
-    A season with failed or missing items is resumed: only those items are fetched again.
+    A season with failed or missing items is resumed: only those items are fetched again, and
+    every player in the stored box scores without a bio gets one.
 
     Passing ``seasons`` forces a refetch of those seasons. With no ``seasons``, every season from
     1996-97 through the latest one (the season containing ``today``) is considered: the latest is
     refetched every run, and a completed older season is skipped.
     """
     if seasons is None:
-        *older, latest = _all_seasons(today or date.today())
-        plan = [(season, False) for season in older] + [(latest, True)]
+        seasons = _all_seasons(today or date.today())
+        refetch = {seasons[-1]}
     else:
-        plan = [(season, True) for season in seasons]
+        refetch = set(seasons)
     report = Report(store.new_log_path())
-    handler = logging.FileHandler(report.log_path, encoding="utf-8")
+    with _logging_to(report.log_path):
+        for season in seasons:
+            for season_type, kind, tables in _game_logs_to_fetch(store, season, season in refetch):
+                _fetch_game_log(source, store, report, season, season_type, kind, tables)
+        _add_new_players(source, store, report)
+        store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
+        store.publish()
+    return report
+
+
+@contextmanager
+def _logging_to(path):
+    """Send this module's log to ``path`` while the block runs."""
+    handler = logging.FileHandler(path, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     log.addHandler(handler)
     log.setLevel(logging.INFO)
     try:
-        _ingest(source, store, plan, report)
+        yield
     finally:
         log.removeHandler(handler)
         handler.close()
-    return report
 
 
-def _ingest(source, store, plan, report):
-    player_ids = set()
-    for season, refetch_complete in plan:
-        todo = _items_to_fetch(store, season, refetch_complete)
-        for season_type in SEASON_TYPES:
-            for kind, all_tables in TABLES.items():
-                tables = [(table, make) for table, make in all_tables if (table, season_type) in todo]
-                if not tables:
-                    continue
-                try:
-                    raw = source.game_log(season, season_type, kind)
-                except Exception as e:
-                    for table, _ in tables:
-                        _fail(store, report, table, season, season_type, e)
-                    continue
-                for table, make in tables:
-                    try:
-                        df = make(raw, season, season_type)
-                        store.write_partition(table, season, season_type, df)
-                    except Exception as e:
-                        _fail(store, report, table, season, season_type, e)
-                        continue
-                    _record(store, report, Item(table, season, season_type, SUCCEEDED, rows=len(df)))
-                    if table == PLAYER_BOX_SCORES:
-                        player_ids.update(df["player_id"])
-    _add_new_players(source, store, report, player_ids)
-    store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
-    store.publish()
+def _game_logs_to_fetch(store, season, refetch_complete):
+    """The game logs of ``season`` with failed or missing items, as ``(season_type, kind, tables)``.
 
-
-def _items_to_fetch(store, season, refetch_complete):
-    """The (table, season_type) items of ``season`` that are failed or missing.
-
-    A season with every item succeeded is fetched in full if ``refetch_complete``, otherwise skipped.
+    ``tables`` lists only the ``(table, transform)`` pairs to write. A season with every item
+    succeeded is fetched in full if ``refetch_complete``, otherwise skipped.
     """
-    every = {(table, season_type) for season_type in SEASON_TYPES for tables in TABLES.values() for table, _ in tables}
-    succeeded = {
-        (i["table"], i["season_type"])
-        for i in store.read_manifest()["items"]
-        if i["season"] == season and i["status"] == SUCCEEDED
-    }
-    return every - succeeded or (every if refetch_complete else set())
+    all_items = {(table, season_type) for season_type in SEASON_TYPES for tables in TABLES.values() for table, _ in tables}
+    to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
+    game_logs = []
+    for season_type in SEASON_TYPES:
+        for kind, tables in TABLES.items():
+            tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
+            if tables:
+                game_logs.append((season_type, kind, tables))
+    return game_logs
+
+
+def _fetch_game_log(source, store, report, season, season_type, kind, tables):
+    """Fetch one game log and write each of its tables, recording each as an item."""
+    try:
+        raw = source.game_log(season, season_type, kind)
+    except Exception as e:
+        for table, _ in tables:
+            _fail(store, report, table, season, season_type, e)
+        return
+    for table, to_table in tables:
+        try:
+            df = to_table(raw, season, season_type)
+            store.write_partition(table, season, season_type, df)
+        except Exception as e:
+            _fail(store, report, table, season, season_type, e)
+        else:
+            _record(store, report, Item(table, season, season_type, SUCCEEDED, rows=len(df)))
 
 
 def _all_seasons(today):
@@ -156,13 +164,15 @@ def _describe(error):
     return f"{type(error).__name__}: {error}"
 
 
-def _add_new_players(source, store, report, player_ids):
-    """Fetch bios only for players not yet stored. Existing bios are never refreshed.
+def _add_new_players(source, store, report):
+    """Fetch bios for players in the stored box scores who have none yet. Existing bios are never refreshed.
 
-    A failed bio is logged and skipped, and the ``players`` item records how many failed.
+    Bios are written every ``BIOS_PER_WRITE`` players, so a crash loses few of them. A failed bio
+    is logged and skipped, and the ``players`` item records how many failed.
     """
     stored = store.read_table(PLAYERS)
-    new_ids = sorted(player_ids - set(stored["player_id"] if stored is not None else []))
+    stored_ids = set(stored["player_id"]) if stored is not None else set()
+    new_ids = sorted(store.distinct_values(PLAYER_BOX_SCORES, "player_id") - stored_ids)
     if not new_ids:
         return
     try:
@@ -170,20 +180,29 @@ def _add_new_players(source, store, report, player_ids):
     except Exception as e:
         _fail(store, report, PLAYERS, None, None, e)
         return
-    infos, errors = [], []
-    for player_id in new_ids:
-        try:
-            infos.append(source.player_info(player_id))
-        except Exception as e:
-            errors.append(e)
-            log.error("players %s bio failed", player_id, exc_info=e)
-    rows = 0
-    if infos:
-        new = transform.players(all_players, infos)
-        store.write_table(PLAYERS, pd.concat([stored, new]) if stored is not None else new)
-        rows = len(new)
+    rows, errors = 0, []
+    for start in range(0, len(new_ids), BIOS_PER_WRITE):
+        infos, batch_errors = _fetch_bios(source, new_ids[start:start + BIOS_PER_WRITE])
+        errors += batch_errors
+        if infos:
+            new = transform.players(all_players, infos)
+            stored = pd.concat([stored, new]) if stored is not None else new
+            store.write_table(PLAYERS, stored)
+            rows += len(new)
     if errors:
         error = f"{len(errors)} of {len(new_ids)} bios failed, first: {_describe(errors[0])}"
         _record(store, report, Item(PLAYERS, None, None, FAILED, rows=rows, error=error))
     else:
         _record(store, report, Item(PLAYERS, None, None, SUCCEEDED, rows=rows))
+
+
+def _fetch_bios(source, player_ids):
+    """Each player's info, and the errors of those that failed, which are logged and skipped."""
+    infos, errors = [], []
+    for player_id in player_ids:
+        try:
+            infos.append(source.player_info(player_id))
+        except Exception as e:
+            errors.append(e)
+            log.error("bio for player %s failed", player_id, exc_info=e)
+    return infos, errors

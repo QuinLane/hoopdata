@@ -365,6 +365,50 @@ def test_a_failed_bio_is_fetched_on_the_next_run(tmp_path):
     assert manifest_items(tmp_path)[("players", None, None)]["rows"] == 1
 
 
+class Crash(BaseException):
+    """Stands in for the process dying: not an ``Exception``, so ingest doesn't record and skip it."""
+
+
+class CrashingBioSource(CountingSource):
+    """Replay source that crashes on the player-info request after ``crash_after`` succeeded."""
+
+    def __init__(self, fixtures_dir, crash_after):
+        super().__init__(fixtures_dir)
+        self.crash_after = crash_after
+
+    def player_info(self, player_id):
+        if len(self.player_info_requests) == self.crash_after:
+            raise Crash()
+        return super().player_info(player_id)
+
+
+def test_a_crash_while_fetching_bios_keeps_most_of_the_bios_fetched_so_far(tmp_path):
+    store = Store(tmp_path)
+    with pytest.raises(Crash):
+        ingest(CrashingBioSource(FIXTURES, crash_after=50), store, seasons=["2023-24"])
+
+    resumed = CountingSource(FIXTURES)
+    ingest(resumed, store, seasons=["2023-24"])
+
+    assert len(resumed.player_info_requests) <= 53 - 40
+
+
+def test_players_left_without_bios_by_a_crash_get_them_on_a_later_run(tmp_path):
+    store = Store(tmp_path)
+    with pytest.raises(Crash):
+        ingest(CrashingBioSource(FIXTURES, crash_after=0), store, seasons=["2022-23"])
+
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        without_bios = con.execute(
+            "select count(distinct player_id) from player_box_scores anti join players using (player_id)"
+        ).fetchone()[0]
+        seasons = con.execute("select count(distinct season) from player_box_scores").fetchone()[0]
+    assert seasons == 2
+    assert without_bios == 0
+
+
 def test_teams_hold_current_identities(db):
     row = db.execute(
         "select abbreviation, city, nickname, full_name, year_founded from teams where team_id = ?",
