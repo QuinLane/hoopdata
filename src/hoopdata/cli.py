@@ -13,9 +13,9 @@ def main(argv=None, source=None):
     parser = argparse.ArgumentParser(prog="hoopdata")
     commands = parser.add_subparsers(dest="command", required=True)
     ingest_parser = commands.add_parser("ingest", help="fetch NBA stats and publish hoopdata.duckdb")
-    which = ingest_parser.add_mutually_exclusive_group(required=True)
-    which.add_argument("--season", help="refetch one season, like 2023-24")
-    which.add_argument(
+    seasons = ingest_parser.add_mutually_exclusive_group(required=True)
+    seasons.add_argument("--season", help="refetch one season, like 2023-24")
+    seasons.add_argument(
         "--all-seasons",
         action="store_true",
         help="every season from 1996-97 to now: the latest is refetched, older ones only if missing or failed",

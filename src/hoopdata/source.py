@@ -89,10 +89,7 @@ class ReplaySource:
 def record_game_log(source, fixtures_dir, season, season_type, kind):
     """Fetch one game log with ``source`` and save it as a replay fixture."""
     response = source.game_log(season, season_type, kind)
-    path = Path(fixtures_dir) / _game_log_name(season, season_type, kind)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(response), encoding="utf-8")
-    return path
+    return _save(response, Path(fixtures_dir) / _game_log_name(season, season_type, kind))
 
 
 def record_all_players(source, fixtures_dir, player_ids):

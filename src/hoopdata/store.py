@@ -125,19 +125,24 @@ class Store:
 
 
 def _write_atomically(path, text):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".tmp")
-    temp.write_text(text, encoding="utf-8")
-    os.replace(temp, path)
+    _replace_atomically(path, lambda temp: temp.write_text(text, encoding="utf-8"))
 
 
 def _write_parquet(df, path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".tmp")
-    try:
+    def write(temp):
         with duckdb.connect() as con:
             con.register("data", df)
             con.execute(f"copy data to '{_sql_path(temp)}' (format parquet)")
+
+    _replace_atomically(path, write)
+
+
+def _replace_atomically(path, write):
+    """Call ``write`` with a temp path next to ``path``, then swap it in, so readers never see a partial file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    try:
+        write(temp)
         os.replace(temp, path)
     finally:
         temp.unlink(missing_ok=True)
