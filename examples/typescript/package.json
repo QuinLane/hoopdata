@@ -1,0 +1,11 @@
+{
+  "name": "hoopdata-typescript-example",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "2.0.1-r.1"
+  }
+}

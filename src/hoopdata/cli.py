@@ -13,7 +13,13 @@ def main(argv=None, source=None):
     parser = argparse.ArgumentParser(prog="hoopdata")
     commands = parser.add_subparsers(dest="command", required=True)
     ingest_parser = commands.add_parser("ingest", help="fetch NBA stats and publish hoopdata.duckdb")
-    ingest_parser.add_argument("--season", required=True, help="season to fetch, like 2023-24")
+    seasons = ingest_parser.add_mutually_exclusive_group(required=True)
+    seasons.add_argument("--season", help="refetch one season, like 2023-24")
+    seasons.add_argument(
+        "--all-seasons",
+        action="store_true",
+        help="every season from 1996-97 to now: the latest is refetched, older ones only if missing or failed",
+    )
     ingest_parser.add_argument(
         "--data-root",
         help=f"where data is written (default: $NBA_DATA_ROOT, then ./{DEFAULT_DATA_ROOT})",
@@ -21,10 +27,12 @@ def main(argv=None, source=None):
     args = parser.parse_args(argv)
 
     data_root = args.data_root or os.environ.get("NBA_DATA_ROOT") or DEFAULT_DATA_ROOT
-    report = ingest(source or NbaApiSource(), Store(data_root), seasons=[args.season])
+    report = ingest(source or NbaApiSource(), Store(data_root), seasons=[args.season] if args.season else None)
     for item in report.items:
-        print(f"{item.table} {item.season} {item.season_type}: {item.rows} rows")
-    return 0
+        outcome = f"FAILED ({item.error})" if item.error else f"{item.rows} rows"
+        print(f"{item.name}: {outcome}")
+    print(f"{len(report.failed)} of {len(report.items)} items failed. Log: {report.log_path}")
+    return 1 if report.failed else 0
 
 
 if __name__ == "__main__":

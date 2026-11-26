@@ -15,6 +15,9 @@ SEASON_TYPES = [REGULAR_SEASON, PLAYOFFS]
 PLAYER = "player"
 TEAM = "team"
 
+ALL_PLAYERS_FILE = "all_players.json"
+PLAYER_INFO_FILE = "player_info.json"
+
 
 class NbaApiSource:
     """Real adapter: calls stats.nba.com via nba_api, paced and retried."""
@@ -38,6 +41,18 @@ class NbaApiSource:
             )
         )
 
+    def all_players(self):
+        from nba_api.stats.endpoints import commonallplayers
+
+        return self._request(lambda: commonallplayers.CommonAllPlayers(timeout=self.timeout))
+
+    def player_info(self, player_id):
+        from nba_api.stats.endpoints import commonplayerinfo
+
+        return self._request(
+            lambda: commonplayerinfo.CommonPlayerInfo(player_id=player_id, timeout=self.timeout)
+        )
+
     def _request(self, make_endpoint):
         for attempt in range(self.retries + 1):
             wait = self.pace_seconds - (time.monotonic() - self._last_request)
@@ -53,7 +68,7 @@ class NbaApiSource:
 
 
 class ReplaySource:
-    """Test adapter: serves responses recorded by ``record_game_log``."""
+    """Test adapter: serves responses recorded by the ``record_*`` functions."""
 
     def __init__(self, fixtures_dir):
         self.fixtures_dir = Path(fixtures_dir)
@@ -62,13 +77,40 @@ class ReplaySource:
         path = self.fixtures_dir / _game_log_name(season, season_type, kind)
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def all_players(self):
+        return json.loads((self.fixtures_dir / ALL_PLAYERS_FILE).read_text(encoding="utf-8"))
+
+    def player_info(self, player_id):
+        """All recorded player infos live in one file, keyed by player ID."""
+        infos = json.loads((self.fixtures_dir / PLAYER_INFO_FILE).read_text(encoding="utf-8"))
+        return infos[str(player_id)]
+
 
 def record_game_log(source, fixtures_dir, season, season_type, kind):
     """Fetch one game log with ``source`` and save it as a replay fixture."""
     response = source.game_log(season, season_type, kind)
-    path = Path(fixtures_dir) / _game_log_name(season, season_type, kind)
+    return _save(response, Path(fixtures_dir) / _game_log_name(season, season_type, kind))
+
+
+def record_all_players(source, fixtures_dir, player_ids):
+    """Fetch the all-players list, keep only ``player_ids``, and save it as a replay fixture."""
+    response = source.all_players()
+    result = response["resultSets"][0]
+    person_id = result["headers"].index("PERSON_ID")
+    wanted = set(player_ids)
+    result["rowSet"] = [row for row in result["rowSet"] if row[person_id] in wanted]
+    return _save(response, Path(fixtures_dir) / ALL_PLAYERS_FILE)
+
+
+def record_player_info(source, fixtures_dir, player_ids):
+    """Fetch each player's info and save them together as one replay fixture."""
+    infos = {str(player_id): source.player_info(player_id) for player_id in player_ids}
+    return _save(infos, Path(fixtures_dir) / PLAYER_INFO_FILE)
+
+
+def _save(response, path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(response), encoding="utf-8")
+    path.write_text(json.dumps(response, indent=1), encoding="utf-8")
     return path
 
 
