@@ -130,3 +130,21 @@ select
     count(*) filter (where wl = 'L') as losses
 from team_box_scores
 group by season, season_type, team_id;
+
+create view player_teams as
+select
+    season,
+    season_type,
+    player_id,
+    arg_max(player_name, game_date) as player_name,
+    team_id,
+    arg_max(team_abbreviation, game_date) as team_abbreviation,
+    count(*) as games_played,
+    min(game_date) as first_game_date,
+    max(game_date) as last_game_date
+from player_box_scores
+group by season, season_type, player_id, team_id;
+
+create view team_rosters as
+select season, season_type, team_id, team_abbreviation, player_id, player_name, games_played
+from player_teams;

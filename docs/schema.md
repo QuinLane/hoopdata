@@ -127,6 +127,30 @@ Wins and losses per team, season and season type.
 | `wins` | BIGINT | Games won |
 | `losses` | BIGINT | Games lost |
 
+### `player_teams`
+
+One row per player per team per season and season type. A player traded mid-season has one row for each team.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season`, `season_type`, `player_id`, `team_id` | | Grain |
+| `player_name` | VARCHAR | Name in the player's latest game for that team |
+| `team_abbreviation` | VARCHAR | Team abbreviation in the player's latest game for that team |
+| `games_played` | BIGINT | Games with a box score row for that team |
+| `first_game_date` | DATE | Date of the player's first game for that team |
+| `last_game_date` | DATE | Date of the player's last game for that team |
+
+### `team_rosters`
+
+Each team's roster per season and season type: only players who appeared in a game for the team. A player traded mid-season is on both teams' rosters.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season`, `season_type`, `team_id`, `player_id` | | Grain |
+| `team_abbreviation` | VARCHAR | Team abbreviation in the player's latest game for that team |
+| `player_name` | VARCHAR | Name in the player's latest game for that team |
+| `games_played` | BIGINT | Games the player appeared in for that team |
+
 ### `hoopdata_info`
 
 One row describing the data. It reads `manifest.json` at query time, so it shows the latest run without reopening or rebuilding anything.
