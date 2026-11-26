@@ -4,6 +4,7 @@ from hoopdata.cli import main
 from hoopdata.source import PLAYER, PLAYOFFS, ReplaySource
 
 FIXTURES = Path(__file__).parent / "fixtures"
+JOKIC = 203999
 
 
 class FailingPlayoffsSource(ReplaySource):
@@ -23,3 +24,21 @@ def test_ingest_command_prints_each_item_and_exits_non_zero_when_one_failed(tmp_
     assert (tmp_path / "hoopdata.duckdb").exists()
     assert "player_box_scores 2023-24 Regular Season: 64 rows" in out
     assert "player_box_scores 2023-24 Playoffs: FAILED (ConnectionError: stats.nba.com timed out)" in out
+
+
+class FailingJokicBioSource(ReplaySource):
+    def player_info(self, player_id):
+        if player_id == JOKIC:
+            raise ConnectionError("stats.nba.com timed out")
+        return super().player_info(player_id)
+
+
+def test_ingest_command_reports_a_failed_bio_fetch(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("NBA_DATA_ROOT", str(tmp_path))
+
+    exit_code = main(["ingest", "--season", "2023-24"], source=FailingJokicBioSource(FIXTURES))
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert (tmp_path / "hoopdata.duckdb").exists()
+    assert "players: FAILED (1 of 53 bios failed, first: ConnectionError: stats.nba.com timed out)" in out

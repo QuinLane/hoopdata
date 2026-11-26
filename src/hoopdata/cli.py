@@ -30,7 +30,7 @@ def main(argv=None, source=None):
     report = ingest(source or NbaApiSource(), Store(data_root), seasons=[args.season] if args.season else None)
     for item in report.items:
         outcome = f"FAILED ({item.error})" if item.error else f"{item.rows} rows"
-        print(f"{item.table} {item.season} {item.season_type}: {outcome}")
+        print(f"{item.name}: {outcome}")
     print(f"{len(report.failed)} of {len(report.items)} items failed. Log: {report.log_path}")
     return 1 if report.failed else 0
 

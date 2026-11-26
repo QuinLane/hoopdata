@@ -29,12 +29,18 @@ TABLES = {
 
 @dataclass
 class Item:
+    """One fetched table, season and season type. ``players`` is one item with no season."""
+
     table: str
-    season: str
-    season_type: str
+    season: str | None
+    season_type: str | None
     status: str
     rows: int | None = None
     error: str | None = None
+
+    @property
+    def name(self):
+        return self.table if self.season is None else f"{self.table} {self.season} {self.season_type}"
 
 
 @dataclass
@@ -98,10 +104,9 @@ def _ingest(source, store, plan, report):
                         _fail(store, report, table, season, season_type, e)
                         continue
                     _record(store, report, Item(table, season, season_type, SUCCEEDED, rows=len(df)))
-                    log.info("%s %s %s succeeded: %d rows", table, season, season_type, len(df))
                     if table == PLAYER_BOX_SCORES:
                         player_ids.update(df["player_id"])
-    _add_new_players(source, store, player_ids)
+    _add_new_players(source, store, report, player_ids)
     store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
     store.publish()
 
@@ -137,19 +142,48 @@ def _season(start_year):
 def _record(store, report, item):
     store.record_item(item.table, item.season, item.season_type, item.status, rows=item.rows, error=item.error)
     report.items.append(item)
+    if item.status == SUCCEEDED:
+        log.info("%s succeeded: %d rows", item.name, item.rows)
 
 
 def _fail(store, report, table, season, season_type, error):
-    _record(store, report, Item(table, season, season_type, FAILED, error=f"{type(error).__name__}: {error}"))
-    log.error("%s %s %s failed", table, season, season_type, exc_info=error)
+    item = Item(table, season, season_type, FAILED, error=_describe(error))
+    _record(store, report, item)
+    log.error("%s failed", item.name, exc_info=error)
 
 
-def _add_new_players(source, store, player_ids):
-    """Fetch bios only for players not yet stored. Existing bios are never refreshed."""
+def _describe(error):
+    return f"{type(error).__name__}: {error}"
+
+
+def _add_new_players(source, store, report, player_ids):
+    """Fetch bios only for players not yet stored. Existing bios are never refreshed.
+
+    A failed bio is logged and skipped, and the ``players`` item records how many failed.
+    """
     stored = store.read_table(PLAYERS)
     new_ids = sorted(player_ids - set(stored["player_id"] if stored is not None else []))
     if not new_ids:
         return
-    infos = [source.player_info(player_id) for player_id in new_ids]
-    new = transform.players(source.all_players(), infos)
-    store.write_table(PLAYERS, pd.concat([stored, new]) if stored is not None else new)
+    try:
+        all_players = source.all_players()
+    except Exception as e:
+        _fail(store, report, PLAYERS, None, None, e)
+        return
+    infos, errors = [], []
+    for player_id in new_ids:
+        try:
+            infos.append(source.player_info(player_id))
+        except Exception as e:
+            errors.append(e)
+            log.error("players %s bio failed", player_id, exc_info=e)
+    rows = 0
+    if infos:
+        new = transform.players(all_players, infos)
+        store.write_table(PLAYERS, pd.concat([stored, new]) if stored is not None else new)
+        rows = len(new)
+    if errors:
+        error = f"{len(errors)} of {len(new_ids)} bios failed, first: {_describe(errors[0])}"
+        _record(store, report, Item(PLAYERS, None, None, FAILED, rows=rows, error=error))
+    else:
+        _record(store, report, Item(PLAYERS, None, None, SUCCEEDED, rows=rows))

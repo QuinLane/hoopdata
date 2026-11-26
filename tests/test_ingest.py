@@ -88,7 +88,7 @@ def test_a_failed_item_is_recorded_and_the_other_items_complete(tmp_path):
     assert [(i.table, i.season_type, i.status) for i in report.items if i.status != "succeeded"] == [
         ("player_box_scores", "Playoffs", "failed")
     ]
-    assert len(report.items) == 6
+    assert len(report.items) == 7
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
         games = con.execute("select count(*) from games").fetchone()[0]
@@ -105,7 +105,8 @@ def test_a_second_run_retries_only_the_failed_item(tmp_path):
 
     assert retry.game_log_requests == [("2023-24", "Playoffs", "player")]
     assert [(i.table, i.season_type, i.status) for i in report.items] == [
-        ("player_box_scores", "Playoffs", "succeeded")
+        ("player_box_scores", "Playoffs", "succeeded"),
+        ("players", None, "succeeded"),
     ]
     assert {i["status"] for i in manifest_items(tmp_path).values()} == {"succeeded"}
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
@@ -325,6 +326,45 @@ def test_player_bios_are_fetched_only_for_players_not_yet_stored(tmp_path):
     assert players == (53, 53)
 
 
+class FailingBioSource(ReplaySource):
+    """Replay source that fails the player info of the given players."""
+
+    def __init__(self, fixtures_dir, failing_player_ids=()):
+        super().__init__(fixtures_dir)
+        self.failing_player_ids = set(failing_player_ids)
+
+    def player_info(self, player_id):
+        if player_id in self.failing_player_ids:
+            raise ConnectionError("stats.nba.com timed out")
+        return super().player_info(player_id)
+
+
+def test_a_failed_bio_is_recorded_and_the_run_still_publishes(tmp_path):
+    report = ingest(FailingBioSource(FIXTURES, failing_player_ids=[JOKIC]), Store(tmp_path), seasons=["2023-24"])
+
+    assert [(i.table, i.status, i.rows, i.error) for i in report.failed] == [
+        ("players", "failed", 52, "1 of 53 bios failed, first: ConnectionError: stats.nba.com timed out")
+    ]
+    assert manifest_items(tmp_path)[("players", None, None)]["status"] == "failed"
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        players = con.execute("select count(*) from players").fetchone()[0]
+        teams = con.execute("select count(*) from teams").fetchone()[0]
+    assert players == 52
+    assert teams == 30
+
+
+def test_a_failed_bio_is_fetched_on_the_next_run(tmp_path):
+    store = Store(tmp_path)
+    ingest(FailingBioSource(FIXTURES, failing_player_ids=[JOKIC]), store, seasons=["2023-24"])
+
+    retry = CountingSource(FIXTURES)
+    report = ingest(retry, store, seasons=["2023-24"])
+
+    assert retry.player_info_requests == [JOKIC]
+    assert report.failed == []
+    assert manifest_items(tmp_path)[("players", None, None)]["rows"] == 1
+
+
 def test_teams_hold_current_identities(db):
     row = db.execute(
         "select abbreviation, city, nickname, full_name, year_founded from teams where team_id = ?",
@@ -353,6 +393,7 @@ def test_manifest_records_each_item_and_the_schema_version(tmp_path):
         ("team_box_scores", "2023-24", "Playoffs"),
         ("games", "2023-24", "Regular Season"),
         ("games", "2023-24", "Playoffs"),
+        ("players", None, None),
     }
     regular = items[("player_box_scores", "2023-24", "Regular Season")]
     assert regular["status"] == "succeeded"

@@ -221,6 +221,7 @@ select schema_version, last_updated from hoopdata_info
 - **`schema_version`**: the version of this schema.
 - **`last_updated`**: UTC time the latest item was recorded.
 - **`items`**: one entry per table, season and season type, holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
+- **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
 - **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
 
 ## When `hoopdata.duckdb` is rebuilt
