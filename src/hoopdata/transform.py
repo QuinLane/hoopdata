@@ -83,7 +83,7 @@ def players(all_players, player_infos):
         "person_id": "player_id", "display_first_last": "display_name",
         "height": "height_in", "weight": "weight_lb",
     })
-    df = df[PLAYER_COLUMNS].replace({"": None, "Undrafted": None})
+    df = df[PLAYER_COLUMNS].replace({"": None, " ": None, "Undrafted": None})
 
     for column in ["first_name", "last_name", "display_name", "position", "country", "school"]:
         df[column] = df[column].astype("string")
