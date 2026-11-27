@@ -172,14 +172,14 @@ Not stored from the source: the `E_*` estimated versions (ADR 0001), every `*_RA
 
 ### `shots` (shots dataset)
 
-One row per field-goal attempt (a shot), with where and how it was taken, exactly as NBA gives it. Free throws aren't shots. Only in a data root whose selection includes `shots`. Source: stats.nba.com `shotchartdetail` with `player_id=0` and the FGA measure, one request per team in core's `team_box_scores` for that season and season type (a league-wide request is too large for a regular season). Stored as Parquet under `shots/shots/season=<season>/`, one file per season type. An item fails as a whole if any of its team requests fails.
+One row per field-goal attempt (a shot), with where and how it was taken, exactly as NBA gives it. Free throws aren't shots. Only in a data root whose selection includes `shots`. Source: stats.nba.com `shotchartdetail` with `player_id=0` and the FGA measure, one request per team in core's `team_box_scores` for that season and season type (a league-wide request is too large for a regular season). Stored as Parquet under `shots/shots/season=<season>/`, one file per season type. An item fails as a whole if any of its team requests fails, and fails without requests if core doesn't hold its season and season type yet; either way it's retried on the next run.
 
 Keys only for identity: names, dates, results and team abbreviations come from core (see `shot_details`). A game's shots add up to core's box scores: per team, the count equals `fga` and the sum of `shot_made_flag` equals `fgm`. This was checked against the live API (1996-97, 2001-02 and 2024-25); there's no runtime check.
 
 | Column | Type | Meaning |
 |---|---|---|
 | `season` | VARCHAR | Season, like `2023-24` |
-| `season_type` | VARCHAR | `Regular Season` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
 | `game_id` | VARCHAR | NBA game ID, leading zeros kept |
 | `game_event_id` | BIGINT | The shot's event number within the game |
 | `player_id` | BIGINT | NBA player ID of the shooter |
