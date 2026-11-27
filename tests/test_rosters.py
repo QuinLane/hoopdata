@@ -13,8 +13,13 @@ SUMMER = date(2024, 7, 1)
 JOKIC = 203999
 # On Denver's 2022-23 roster but out all season with a broken leg, so never in a box score.
 GILLESPIE = 1631221
+MALONE = 2610
+POPEYE_JONES = 202434
+HAM = 203005  # Lakers head coach in 2022-23; their 2023-24 report, made after he was fired, lists no head coach
+BORREGO = 202435  # Pelicans associate head coach in 2023-24
 NUGGETS = 1610612743
 LAKERS = 1610612747
+PELICANS = 1610612740
 
 
 @pytest.fixture
@@ -63,9 +68,6 @@ def test_official_roster_details_adds_cores_team_and_the_bio_only_for_players_wh
     ]
 
 
-MALONE = 2610
-
-
 def test_coach_seasons_hold_only_coaches_as_given_with_only_the_kept_columns(db):
     columns = db.execute("select column_name, column_type from (describe coach_seasons)").fetchall()
     rows = db.execute(
@@ -94,12 +96,6 @@ def test_coach_seasons_hold_only_coaches_as_given_with_only_the_kept_columns(db)
         ("Assistant Coach",), ("Assistant Coach for Player Development",), ("Associate Head Coach",),
         ("Head Coach",), ("Lead Assistant Coach",),
     ]
-
-
-POPEYE_JONES = 202434
-HAM = 203005  # Lakers head coach in 2022-23; their 2023-24 report, made after he was fired, lists no head coach
-BORREGO = 202435  # Pelicans associate head coach in 2023-24
-PELICANS = 1610612740
 
 
 def test_coach_views_follow_each_coach_across_teams_and_seasons(db):
