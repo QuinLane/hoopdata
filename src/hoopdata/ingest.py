@@ -22,6 +22,13 @@ FIRST_SEASON_START_YEAR = 1996
 # Bios are written to players.parquet after every this many players.
 BIOS_PER_WRITE = 20
 
+# The source paces requests about this far apart, which the time estimate assumes.
+SECONDS_PER_REQUEST = 1
+
+# Rough requests for each dataset's full backfill of every season, shown in --help.
+# Core: ~120 game logs (30 seasons, 2 season types, 2 kinds) plus ~2,700 player bios.
+FULL_BACKFILL_REQUESTS = {CORE: 2_800}
+
 log = logging.getLogger(__name__)
 
 # Each game log kind feeds these tables, each with its transform.
@@ -78,11 +85,12 @@ def ingest(source, store, seasons=None, today=None):
     today = today or date.today()
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
+    game_logs = [(season, *game_log) for season in selected for game_log in _game_logs_to_fetch(store, season, season == latest)]
+    print(_estimate({CORE: len(game_logs) + len(_players_without_bios(store))}))
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
-        for season in selected:
-            for season_type, kind, tables in _game_logs_to_fetch(store, season, season == latest):
-                _fetch_game_log(source, store, report, season, season_type, kind, tables)
+        for season, season_type, kind, tables in game_logs:
+            _fetch_game_log(source, store, report, season, season_type, kind, tables)
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
         store.publish()
@@ -100,6 +108,32 @@ def _add_seasons(selection, seasons):
     if seasons == ALL_SEASONS:
         return {**selection, "seasons": ALL_SEASONS}
     return {**selection, "seasons": sorted(set(selection["seasons"]) | set(seasons))}
+
+
+def _estimate(requests):
+    """A line like ``About 38,400 requests, roughly 11 h (pbp: 37,900 · core: 500)`` from requests per dataset.
+
+    Bios of players first seen in this run's game logs can't be known yet, so they aren't counted.
+    """
+    total = sum(requests.values())
+    breakdown = " · ".join(f"{dataset}: {count:,}" for dataset, count in requests.items())
+    return f"About {total:,} requests, roughly {_duration(total * SECONDS_PER_REQUEST)} ({breakdown})"
+
+
+def full_backfill_costs():
+    """Each dataset's full-backfill cost, like ``core: about 2,800 requests, roughly 47 min``."""
+    return "; ".join(
+        f"{dataset}: about {count:,} requests, roughly {_duration(count * SECONDS_PER_REQUEST)}"
+        for dataset, count in FULL_BACKFILL_REQUESTS.items()
+    )
+
+
+def _duration(seconds):
+    if seconds < 60:
+        return f"{seconds} s"
+    if seconds < 60 * 60:
+        return f"{round(seconds / 60)} min"
+    return f"{round(seconds / 60 / 60)} h"
 
 
 @contextmanager
@@ -189,8 +223,7 @@ def _add_new_players(source, store, report):
     is logged and skipped, and the ``players`` item records how many failed.
     """
     stored = store.read_table(PLAYERS)
-    stored_ids = set(stored["player_id"]) if stored is not None else set()
-    new_ids = sorted(store.distinct_values(PLAYER_BOX_SCORES, "player_id") - stored_ids)
+    new_ids = _players_without_bios(store)
     if not new_ids:
         return
     try:
@@ -212,6 +245,13 @@ def _add_new_players(source, store, report):
         _record(store, report, Item(PLAYERS, None, None, FAILED, rows=rows, error=error))
     else:
         _record(store, report, Item(PLAYERS, None, None, SUCCEEDED, rows=rows))
+
+
+def _players_without_bios(store):
+    """The ids of players in the stored box scores who have no bio yet, sorted."""
+    stored = store.read_table(PLAYERS)
+    stored_ids = set(stored["player_id"]) if stored is not None else set()
+    return sorted(store.distinct_values(PLAYER_BOX_SCORES, "player_id") - stored_ids)
 
 
 def _fetch_bios(source, player_ids):

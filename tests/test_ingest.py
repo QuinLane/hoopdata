@@ -822,3 +822,56 @@ def test_a_v1_manifest_without_a_selection_is_saved_as_core_with_all_seasons(tmp
 
     assert selection(tmp_path) == {"datasets": ["core"], "seasons": "all"}
     assert source.seasons_requested == ["2024-25"]
+
+
+class FailingPlayoffsAndJokicSource(FailingSource):
+    """Replay source that fails the player playoffs game log and Jokic's bio."""
+
+    def __init__(self, fixtures_dir):
+        super().__init__(fixtures_dir, failing=[(PLAYOFFS, PLAYER)])
+
+    def player_info(self, player_id):
+        if player_id == JOKIC:
+            raise ConnectionError("stats.nba.com timed out")
+        return super().player_info(player_id)
+
+
+def test_the_estimate_counts_one_request_per_failed_game_log_and_missing_bio(tmp_path, capsys):
+    store = Store(tmp_path)
+    ingest(FailingPlayoffsAndJokicSource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 11, 26))
+    capsys.readouterr()
+
+    ingest(ReplaySource(FIXTURES), store, today=date(2024, 11, 26))
+
+    assert "About 2 requests, roughly 2 s (core: 2)" in capsys.readouterr().out
+
+
+class PrintedBeforeRequestSource(ReplaySource):
+    """Replay source that captures what has been printed when the first request is made."""
+
+    def __init__(self, fixtures_dir, capsys):
+        super().__init__(fixtures_dir)
+        self.capsys = capsys
+        self.printed_before_first_request = None
+
+    def game_log(self, season, season_type, kind):
+        if self.printed_before_first_request is None:
+            self.printed_before_first_request = self.capsys.readouterr().out
+        return super().game_log(season, season_type, kind)
+
+
+def test_refetching_only_the_latest_season_prints_its_small_estimate_before_any_request(tmp_path, capsys):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=date(2024, 7, 1))
+    capsys.readouterr()
+
+    source = PrintedBeforeRequestSource(FIXTURES, capsys)
+    ingest(source, store, today=date(2024, 7, 2))
+
+    assert "About 4 requests, roughly 4 s (core: 4)" in source.printed_before_first_request
+
+
+def test_a_first_all_seasons_run_estimates_one_request_per_game_log_in_minutes(tmp_path, capsys):
+    ingest(BackfillSource(FIXTURES), Store(tmp_path), seasons=ALL_SEASONS, today=date(2024, 11, 26))
+
+    assert "About 116 requests, roughly 2 min (core: 116)" in capsys.readouterr().out

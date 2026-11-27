@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from hoopdata.ingest import EmptySelectionError, ingest
+from hoopdata.ingest import EmptySelectionError, full_backfill_costs, ingest
 from hoopdata.source import NbaApiSource
 from hoopdata.store import ALL_SEASONS, Store
 
@@ -12,7 +12,11 @@ DEFAULT_DATA_ROOT = "data"
 def main(argv=None, source=None):
     parser = argparse.ArgumentParser(prog="hoopdata")
     commands = parser.add_subparsers(dest="command", required=True)
-    ingest_parser = commands.add_parser("ingest", help="fetch NBA stats and publish hoopdata.duckdb")
+    ingest_parser = commands.add_parser(
+        "ingest",
+        help="fetch NBA stats and publish hoopdata.duckdb",
+        epilog=f"Full-backfill cost per dataset, at about 1 s per request: {full_backfill_costs()}.",
+    )
     seasons = ingest_parser.add_mutually_exclusive_group()
     seasons.add_argument("--season", help="add one season, like 2023-24, to the data root's selection")
     seasons.add_argument(
