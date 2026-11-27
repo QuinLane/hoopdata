@@ -66,6 +66,20 @@ class NbaApiSource:
             )
         )
 
+    def shot_chart(self, season, season_type, team_id):
+        from nba_api.stats.endpoints import shotchartdetail
+
+        return self._request(
+            lambda: shotchartdetail.ShotChartDetail(
+                team_id=team_id,
+                player_id=0,
+                season_nullable=season,
+                season_type_all_star=season_type,
+                context_measure_simple="FGA",
+                timeout=self.timeout,
+            )
+        )
+
     def all_players(self):
         from nba_api.stats.endpoints import commonallplayers
 
@@ -110,6 +124,10 @@ class ReplaySource:
         path = self.fixtures_dir / _team_advanced_game_log_name(season, season_type)
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def shot_chart(self, season, season_type, team_id):
+        path = self.fixtures_dir / _shot_chart_name(season, season_type, team_id)
+        return json.loads(path.read_text(encoding="utf-8"))
+
     def all_players(self):
         return json.loads((self.fixtures_dir / ALL_PLAYERS_FILE).read_text(encoding="utf-8"))
 
@@ -135,6 +153,16 @@ def record_team_advanced_game_log(source, fixtures_dir, season, season_type):
     """Fetch one advanced team game log with ``source`` and save it as a replay fixture."""
     response = source.team_advanced_game_log(season, season_type)
     return _save(response, Path(fixtures_dir) / _team_advanced_game_log_name(season, season_type))
+
+
+def record_shot_chart(source, fixtures_dir, season, season_type, team_id, game_ids):
+    """Fetch one team's shot chart, keep only the shots in ``game_ids``, and save it as a replay fixture."""
+    response = source.shot_chart(season, season_type, team_id)
+    result = response["resultSets"][0]
+    game_id = result["headers"].index("GAME_ID")
+    wanted = set(game_ids)
+    result["rowSet"] = [row for row in result["rowSet"] if row[game_id] in wanted]
+    return _save(response, Path(fixtures_dir) / _shot_chart_name(season, season_type, team_id))
 
 
 def record_all_players(source, fixtures_dir, player_ids):
@@ -169,3 +197,7 @@ def _player_advanced_game_log_name(season, season_type):
 
 def _team_advanced_game_log_name(season, season_type):
     return f"team_advanced_game_log_{season}_{season_type.replace(' ', '_').lower()}.json"
+
+
+def _shot_chart_name(season, season_type, team_id):
+    return f"shot_chart_{team_id}_{season}_{season_type.replace(' ', '_').lower()}.json"

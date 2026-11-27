@@ -9,7 +9,7 @@ import pandas as pd
 from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
-from hoopdata.source import PLAY_IN, PLAYER, SEASON_TYPES, TEAM
+from hoopdata.source import PLAY_IN, PLAYER, REGULAR_SEASON, SEASON_TYPES, TEAM
 from hoopdata.store import ALL_SEASONS, CORE, FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
@@ -19,6 +19,7 @@ PLAYERS = "players"
 TEAMS = "teams"
 PLAYER_ADVANCED_BOX_SCORES = "player_advanced_box_scores"
 TEAM_ADVANCED_BOX_SCORES = "team_advanced_box_scores"
+SHOTS = "shots"
 
 ADVANCED = "advanced"
 
@@ -40,7 +41,9 @@ NEW_PLAYERS_PER_SEASON = 90
 # Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player
 # bios (NEW_PLAYERS_PER_SEASON for each season).
 # Advanced: one league-wide player and one team game log per season and season type, ~125 requests.
-FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 125}
+# Shots: one shot chart per team per season and season type, ~1,400 requests (30 teams in a regular season, 16 in
+# the playoffs, 8 in the Play-In).
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 125, SHOTS: 1_400}
 
 log = logging.getLogger(__name__)
 
@@ -55,16 +58,20 @@ TABLES = {
 class Dataset:
     """A group of tables and views loaded or left out together.
 
-    Like core's game logs, a dataset is fetched with one request per season, season type and kind.
-    ``tables`` maps each kind to the ``(table, transform)`` pairs its response feeds, ``fetch``
-    makes one request as ``fetch(source, season, season_type, kind)``, and ``views`` is the SQL
-    that publishes its views, with ``{root}`` standing for the data root.
+    Like core's game logs, a dataset is fetched once per season, season type and kind. ``tables``
+    maps each kind to the ``(table, transform)`` pairs its response feeds, ``fetch`` gets the
+    response as ``fetch(source, store, season, season_type, kind)``, and ``views`` is the SQL that
+    publishes its views, with ``{root}`` standing for the data root. A fetch can make several
+    requests, reading what to ask for from ``store``. ``requests_per_item`` names the season types
+    the dataset has and the requests each of their fetches makes; ``None`` means every season type
+    at one request.
     """
 
     name: str
     tables: dict
     fetch: object
     views: str
+    requests_per_item: dict | None = None
 
     @property
     def table_names(self):
@@ -83,8 +90,14 @@ class Dataset:
             for season_type, kind, tables in self._requests_to_fetch(store, season, season == latest)
         ]
 
+    def request_count(self, to_fetch):
+        """How many requests fetching ``to_fetch``, from ``to_fetch()``, makes."""
+        if self.requests_per_item is None:
+            return len(to_fetch)
+        return sum(self.requests_per_item[season_type] for _, season_type, _, _ in to_fetch)
+
     def _requests_to_fetch(self, store, season, refetch_complete):
-        season_types = _season_types(season)
+        season_types = [t for t in _season_types(season) if self.requests_per_item is None or t in self.requests_per_item]
         all_items = {(table, season_type) for season_type in season_types for table in self.table_names}
         to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
         requests = []
@@ -104,7 +117,7 @@ DATASETS = {
     CORE: Dataset(
         CORE,
         TABLES,
-        lambda source, season, season_type, kind: source.game_log(season, season_type, kind),
+        lambda source, store, season, season_type, kind: source.game_log(season, season_type, kind),
         files("hoopdata").joinpath("views.sql").read_text(encoding="utf-8"),
     ),
     ADVANCED: Dataset(
@@ -113,14 +126,27 @@ DATASETS = {
             PLAYER: [(PLAYER_ADVANCED_BOX_SCORES, transform.player_advanced_box_scores)],
             TEAM: [(TEAM_ADVANCED_BOX_SCORES, transform.team_advanced_box_scores)],
         },
-        lambda source, season, season_type, kind: (
+        lambda source, store, season, season_type, kind: (
             source.player_advanced_game_log(season, season_type)
             if kind == PLAYER
             else source.team_advanced_game_log(season, season_type)
         ),
         files("hoopdata").joinpath("advanced_views.sql").read_text(encoding="utf-8"),
     ),
+    SHOTS: Dataset(
+        SHOTS,
+        {TEAM: [(SHOTS, transform.shots)]},
+        lambda source, store, season, season_type, kind: _fetch_shot_charts(source, store, season, season_type),
+        files("hoopdata").joinpath("shots_views.sql").read_text(encoding="utf-8"),
+        requests_per_item={REGULAR_SEASON: 30},
+    ),
 }
+
+
+def _fetch_shot_charts(source, store, season, season_type):
+    """Each team's shot chart, for every team in core's team box scores of ``season`` and ``season_type``."""
+    team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
+    return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
 
 
 class EmptySelectionError(Exception):
@@ -191,7 +217,7 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
     requests = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
-    counts = {name: len(to_fetch) for name, to_fetch in requests.items()}
+    counts = {name: DATASETS[name].request_count(to_fetch) for name, to_fetch in requests.items()}
     counts[CORE] += len(_players_without_bios(store)) + NEW_PLAYERS_PER_SEASON * len(
         _seasons_without_box_scores(store, requests[CORE])
     )
@@ -312,7 +338,7 @@ def _season_types(season):
 def _fetch_game_log(source, store, report, dataset, season, season_type, kind, tables):
     """Fetch one of ``dataset``'s game logs and write each of its tables, recording each as an item."""
     try:
-        raw = dataset.fetch(source, season, season_type, kind)
+        raw = dataset.fetch(source, store, season, season_type, kind)
     except Exception as e:
         for table, _ in tables:
             _fail(store, report, table, season, season_type, e)
