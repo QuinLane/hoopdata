@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 from datetime import datetime, timezone
-from importlib.resources import files
 from pathlib import Path
 
 import duckdb
@@ -35,6 +34,10 @@ class Store:
     @property
     def manifest_path(self):
         return self.root / MANIFEST_NAME
+
+    def dataset_root(self, dataset):
+        """Where ``dataset``'s tables live: the data root for core, its own top-level folder for the others."""
+        return self.root if dataset == CORE else self.root / dataset
 
     def new_log_path(self):
         """A fresh log file path for one run, named by its start time."""
@@ -94,12 +97,18 @@ class Store:
         manifest["items"] = sorted(items, key=lambda i: (i["table"], i["season"], i["season_type"]))
         _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
 
-    def write_partition(self, table, season, season_type, df):
-        """Atomically write one table/season/season_type partition as Parquet.
+    def drop_items(self, tables):
+        """Remove every item of ``tables`` from the manifest."""
+        manifest = self.read_manifest()
+        manifest["items"] = [i for i in manifest["items"] if i["table"] not in tables]
+        _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
+
+    def write_partition(self, table, season, season_type, df, dataset=CORE):
+        """Atomically write one table/season/season_type partition of ``dataset`` as Parquet.
 
         ``season`` lives in the hive folder name, so it is left out of the file.
         """
-        folder = self.root / table / f"season={season}"
+        folder = self.dataset_root(dataset) / table / f"season={season}"
         path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
         _write_parquet(df.drop(columns="season"), path)
 
@@ -123,16 +132,16 @@ class Store:
             pattern = _sql_path(self.root / table / "*" / "*.parquet")
             return {row[0] for row in con.execute(f"select distinct {column} from read_parquet('{pattern}')").fetchall()}
 
-    def publish(self):
-        """Build the views-only DuckDB file that consumers open read-only.
+    def publish(self, views):
+        """Build the views-only DuckDB file that consumers open read-only, from the selected datasets' ``views`` SQL.
 
-        The file is rebuilt only when the views, the schema version or the data root
+        The file is rebuilt only when the views, the schema version, the selection or the data root
         have changed since it was last built. New data shows up through the views anyway.
         """
-        sql = files("hoopdata").joinpath("views.sql").read_text(encoding="utf-8")
-        sql = sql.replace("{root}", _sql_path(self.root))
-        views_hash = hashlib.sha256(f"{SCHEMA_VERSION}\n{sql}".encode()).hexdigest()
+        sql = "\n".join(views).replace("{root}", _sql_path(self.root))
         manifest = self.read_manifest()
+        selection = json.dumps(manifest.get("selection"))
+        views_hash = hashlib.sha256(f"{SCHEMA_VERSION}\n{selection}\n{sql}".encode()).hexdigest()
         if self.database_path.exists() and manifest.get("views_hash") == views_hash:
             return
 

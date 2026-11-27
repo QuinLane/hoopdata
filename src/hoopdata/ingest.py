@@ -2,6 +2,7 @@ import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
+from importlib.resources import files
 from pathlib import Path
 
 import pandas as pd
@@ -31,8 +32,71 @@ TABLES = {
 }
 
 
+@dataclass
+class Dataset:
+    """A group of tables and views loaded or left out together.
+
+    Like core's game logs, a dataset is fetched with one request per season, season type and kind.
+    ``tables`` maps each kind to the ``(table, transform)`` pairs its response feeds, ``fetch``
+    makes one request as ``fetch(source, season, season_type, kind)``, and ``views`` is the SQL
+    that publishes its views, with ``{root}`` standing for the data root.
+    """
+
+    name: str
+    tables: dict
+    fetch: object
+    views: str
+
+    def to_fetch(self, store, seasons, latest):
+        """The requests with failed or missing items in ``seasons``, as ``(season, season_type, kind, tables)``.
+
+        ``tables`` lists only the ``(table, transform)`` pairs to write. A season with every item
+        succeeded is skipped, except ``latest``, which is fetched in full.
+        """
+        return [
+            (season, season_type, kind, tables)
+            for season in seasons
+            for season_type, kind, tables in self._game_logs_to_fetch(store, season, season == latest)
+        ]
+
+    def requests(self, store, seasons, latest):
+        """How many requests fetching ``seasons`` will make."""
+        return len(self.to_fetch(store, seasons, latest))
+
+    def _game_logs_to_fetch(self, store, season, refetch_complete):
+        all_items = {
+            (table, season_type) for season_type in SEASON_TYPES for tables in self.tables.values() for table, _ in tables
+        }
+        to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
+        game_logs = []
+        for season_type in SEASON_TYPES:
+            for kind, tables in self.tables.items():
+                tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
+                if tables:
+                    game_logs.append((season_type, kind, tables))
+        return game_logs
+
+
+# The ``datasets`` value that means every dataset in ``DATASETS``.
+ALL_DATASETS = "all"
+
+# Every dataset a data root can hold, by name. Only core until the dataset specs land.
+DATASETS = {
+    CORE: Dataset(
+        CORE,
+        TABLES,
+        lambda source, season, season_type, kind: source.game_log(season, season_type, kind),
+        files("hoopdata").joinpath("views.sql").read_text(encoding="utf-8"),
+    ),
+}
+
+
 class EmptySelectionError(Exception):
     """Plain ``ingest`` on a data root with no selection yet: there is nothing to keep current."""
+
+
+class UnknownDatasetError(Exception):
+    """A dataset name that isn't one of ``DATASETS``."""
 
 
 @dataclass
@@ -61,31 +125,42 @@ class Report:
         return [item for item in self.items if item.status == FAILED]
 
 
-def ingest(source, store, seasons=None, today=None):
+def ingest(source, store, seasons=None, datasets=None, today=None):
     """Fetch each season's player and team box scores, bios for new players and the team list, and publish the views.
 
     The data root remembers its selection (ADR 0002). ``seasons`` adds to it: a list of seasons, or
     ``"all"`` for every season from 1996-97 on, including future ones. With no ``seasons`` the saved
-    selection is kept as it is, and an empty data root raises ``EmptySelectionError``.
+    selection is kept as it is, and an empty data root raises ``EmptySelectionError``. ``datasets``
+    adds names from ``DATASETS`` for the seasons already held; an unknown name raises
+    ``UnknownDatasetError`` before anything changes.
 
     Every run fetches the failed or missing items of the selected seasons, and refetches the latest
     season (the one containing ``today``) if the selection includes it. A failed item (table +
     season + season type) is recorded and skipped, and the run continues. Every player in the stored
     box scores without a bio gets one.
     """
-    selection = _add_seasons(store.read_selection(), seasons)
+    if datasets is not None and ALL_DATASETS in datasets:
+        datasets = list(DATASETS)
+    unknown = sorted(set(datasets or []) - set(DATASETS))
+    if unknown:
+        raise UnknownDatasetError(f"Unknown dataset: {', '.join(unknown)}. Choose from {', '.join(DATASETS)} or all.")
+    selection = _drop_deleted_datasets(store, store.read_selection())
+    selection = _add_datasets(_add_seasons(selection, seasons), datasets)
+    for name in selection["datasets"]:
+        store.dataset_root(name).mkdir(parents=True, exist_ok=True)
     store.write_selection(selection)
     today = today or date.today()
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
-        for season in selected:
-            for season_type, kind, tables in _game_logs_to_fetch(store, season, season == latest):
-                _fetch_game_log(source, store, report, season, season_type, kind, tables)
+        for name in selection["datasets"]:
+            dataset = DATASETS[name]
+            for season, season_type, kind, tables in dataset.to_fetch(store, selected, latest):
+                _fetch_game_log(source, store, report, dataset, season, season_type, kind, tables)
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
-        store.publish()
+        store.publish([DATASETS[name].views for name in selection["datasets"]])
     return report
 
 
@@ -102,6 +177,25 @@ def _add_seasons(selection, seasons):
     return {**selection, "seasons": sorted(set(selection["seasons"]) | set(seasons))}
 
 
+def _drop_deleted_datasets(store, selection):
+    """A selected dataset whose folder is gone has been deleted: it leaves ``selection`` and its items are dropped."""
+    if selection is None:
+        return None
+    deleted = [name for name in selection["datasets"] if not store.dataset_root(name).is_dir()]
+    if not deleted:
+        return selection
+    store.drop_items({table for name in deleted for tables in DATASETS[name].tables.values() for table, _ in tables})
+    return {**selection, "datasets": [name for name in selection["datasets"] if name not in deleted]}
+
+
+def _add_datasets(selection, datasets):
+    """``selection`` with ``datasets`` added, core first."""
+    if datasets is None:
+        return selection
+    names = set(selection["datasets"]) | set(datasets)
+    return {**selection, "datasets": sorted(names, key=lambda name: (name != CORE, name))}
+
+
 @contextmanager
 def _logging_to(path):
     """Send this module's log to ``path`` while the block runs."""
@@ -116,27 +210,10 @@ def _logging_to(path):
         handler.close()
 
 
-def _game_logs_to_fetch(store, season, refetch_complete):
-    """The game logs of ``season`` with failed or missing items, as ``(season_type, kind, tables)``.
-
-    ``tables`` lists only the ``(table, transform)`` pairs to write. A season with every item
-    succeeded is fetched in full if ``refetch_complete``, otherwise skipped.
-    """
-    all_items = {(table, season_type) for season_type in SEASON_TYPES for tables in TABLES.values() for table, _ in tables}
-    to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
-    game_logs = []
-    for season_type in SEASON_TYPES:
-        for kind, tables in TABLES.items():
-            tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
-            if tables:
-                game_logs.append((season_type, kind, tables))
-    return game_logs
-
-
-def _fetch_game_log(source, store, report, season, season_type, kind, tables):
-    """Fetch one game log and write each of its tables, recording each as an item."""
+def _fetch_game_log(source, store, report, dataset, season, season_type, kind, tables):
+    """Fetch one of ``dataset``'s game logs and write each of its tables, recording each as an item."""
     try:
-        raw = source.game_log(season, season_type, kind)
+        raw = dataset.fetch(source, season, season_type, kind)
     except Exception as e:
         for table, _ in tables:
             _fail(store, report, table, season, season_type, e)
@@ -144,7 +221,7 @@ def _fetch_game_log(source, store, report, season, season_type, kind, tables):
     for table, to_table in tables:
         try:
             df = to_table(raw, season, season_type)
-            store.write_partition(table, season, season_type, df)
+            store.write_partition(table, season, season_type, df, dataset=dataset.name)
         except Exception as e:
             _fail(store, report, table, season, season_type, e)
         else:

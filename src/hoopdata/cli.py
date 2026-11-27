@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from hoopdata.ingest import EmptySelectionError, ingest
+from hoopdata.ingest import EmptySelectionError, UnknownDatasetError, ingest
 from hoopdata.source import NbaApiSource
 from hoopdata.store import ALL_SEASONS, Store
 
@@ -21,6 +21,10 @@ def main(argv=None, source=None):
         help="widen the data root's selection to every season from 1996-97 on, including future ones",
     )
     ingest_parser.add_argument(
+        "--datasets",
+        help="add datasets, as a comma-separated list or all, to the data root's selection",
+    )
+    ingest_parser.add_argument(
         "--data-root",
         help=f"where data is written (default: $NBA_DATA_ROOT, then ./{DEFAULT_DATA_ROOT})",
     )
@@ -28,9 +32,10 @@ def main(argv=None, source=None):
 
     data_root = args.data_root or os.environ.get("NBA_DATA_ROOT") or DEFAULT_DATA_ROOT
     seasons = [args.season] if args.season else ALL_SEASONS if args.all_seasons else None
+    datasets = args.datasets.split(",") if args.datasets else None
     try:
-        report = ingest(source or NbaApiSource(), Store(data_root), seasons=seasons)
-    except EmptySelectionError as e:
+        report = ingest(source or NbaApiSource(), Store(data_root), seasons=seasons, datasets=datasets)
+    except (EmptySelectionError, UnknownDatasetError) as e:
         print(e, file=sys.stderr)
         return 2
     for item in report.items:
