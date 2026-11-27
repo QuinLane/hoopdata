@@ -122,11 +122,7 @@ class Store:
 
     def read_partition(self, table, season, season_type, dataset=CORE):
         """Read one table/season/season_type partition of ``dataset``, or ``None`` if it hasn't been written yet."""
-        path = self._partition_path(table, season, season_type, dataset)
-        if not path.exists():
-            return None
-        with duckdb.connect() as con:
-            return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
+        return _read_parquet(self._partition_path(table, season, season_type, dataset))
 
     def write_table(self, table, df):
         """Atomically write a whole unpartitioned table as one Parquet file."""
@@ -134,11 +130,13 @@ class Store:
 
     def read_table(self, table):
         """Read an unpartitioned table, or ``None`` if it hasn't been written yet."""
-        path = self.root / f"{table}.parquet"
-        if not path.exists():
-            return None
-        with duckdb.connect() as con:
-            return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
+        return _read_parquet(self.root / f"{table}.parquet")
+
+    def _partition_path(self, table, season, season_type, dataset):
+        """The Parquet file of one table/season/season_type partition of ``dataset``, ``season.parquet`` if season-only."""
+        folder = self.dataset_root(dataset) / table / f"season={season}"
+        name = SEASON_ONLY_FILE if season_type is None else season_type.replace(" ", "_").lower()
+        return folder / f"{name}.parquet"
 
     def distinct_values(self, table, column):
         """The distinct values of ``column`` across every partition of ``table``, empty if none are written."""
@@ -168,11 +166,6 @@ class Store:
         os.replace(temp, self.database_path)
         self._write_manifest_key("views_hash", views_hash)
 
-    def _partition_path(self, table, season, season_type, dataset):
-        folder = self.dataset_root(dataset) / table / f"season={season}"
-        name = SEASON_ONLY_FILE if season_type is None else season_type.replace(" ", "_").lower()
-        return folder / f"{name}.parquet"
-
     def _write_manifest_key(self, key, value):
         """Set one top-level key of the manifest, keeping the rest."""
         manifest = self.read_manifest()
@@ -191,6 +184,14 @@ def _write_parquet(df, path):
             con.execute(f"copy data to '{_sql_path(temp)}' (format parquet)")
 
     _replace_atomically(path, write)
+
+
+def _read_parquet(path):
+    """Read one Parquet file, or ``None`` if it hasn't been written yet."""
+    if not path.exists():
+        return None
+    with duckdb.connect() as con:
+        return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
 
 
 def _replace_atomically(path, write):
