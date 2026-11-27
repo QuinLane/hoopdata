@@ -221,6 +221,7 @@ One row per season, team and player on the team's official roster, as NBA last r
 **What the snapshot leaves out.** The official roster is one snapshot, stored as given and not repaired:
 - Players gone before NBA's last report are missing. SEA 1996-97 lists 12 players where core has 16 who appeared: Craig Ehlo (62 games) isn't there. OKC 2024-25 misses Alex Reese and Malevy Leons.
 - A new season's official rosters arrive only after its first game, since the teams come from core.
+- Players who never appeared in a game have no bio, since bios come from `players`, which only covers players in a box score. Nikola Topić (OKC 2024-25) is on the official roster, but `official_roster_details` has `NULL` bio columns for him.
 
 Not stored from the source: `LeagueID`, the source `SEASON` (the start year), `NICKNAME`, `PLAYER_SLUG`, `SUPPLEMENTAL_STATUS` and the bio columns `HEIGHT`, `WEIGHT`, `BIRTH_DATE`, `AGE` and `SCHOOL` (bios live in `players`), and the second result set, the team's staff (its coaches are stored in `coach_seasons`).
 
