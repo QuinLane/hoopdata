@@ -147,8 +147,8 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     The data root remembers its selection (ADR 0002). ``seasons`` adds to it: a list of seasons, or
     ``"all"`` for every season from 1996-97 on, including future ones. With no ``seasons`` the saved
     selection is kept as it is, and an empty data root raises ``EmptySelectionError``. ``datasets``
-    adds names from ``DATASETS`` for the seasons already held; an unknown name raises
-    ``UnknownDatasetError`` before anything changes.
+    adds names from ``DATASETS`` for the seasons already held; an unknown name, passed or in the saved
+    selection, raises ``UnknownDatasetError`` before anything changes.
 
     Every run fetches the failed or missing items of the selected seasons, and refetches the latest
     season (the one containing ``today``) if the selection includes it. A failed item (table +
@@ -160,7 +160,13 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     unknown = sorted(set(datasets or []) - set(DATASETS))
     if unknown:
         raise UnknownDatasetError(f"Unknown dataset: {', '.join(unknown)}. Choose from {', '.join(DATASETS)} or all.")
-    selection = _drop_deleted_datasets(store, store.read_selection())
+    selection = store.read_selection()
+    unregistered = sorted(set(selection["datasets"]) - set(DATASETS)) if selection else []
+    if unregistered:
+        raise UnknownDatasetError(
+            f"The data root's selection has a dataset this hoopdata doesn't know: {', '.join(unregistered)}."
+        )
+    selection = _drop_deleted_datasets(store, selection)
     selection = _add_datasets(_add_seasons(selection, seasons), datasets)
     for name in selection["datasets"]:
         store.dataset_root(name).mkdir(parents=True, exist_ok=True)

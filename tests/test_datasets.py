@@ -105,6 +105,19 @@ def test_an_unknown_dataset_exits_non_zero_and_changes_nothing(tmp_path, fake, c
     assert fake.requests_made == []
 
 
+def test_a_saved_dataset_that_is_no_longer_registered_exits_non_zero_naming_it(tmp_path, capsys):
+    main(["ingest", "--data-root", str(tmp_path), "--season", "2023-24"], source=ReplaySource(FIXTURES))
+    saved = manifest(tmp_path)
+    saved["selection"]["datasets"].append("retired")
+    (tmp_path / "manifest.json").write_text(json.dumps(saved), encoding="utf-8")
+    (tmp_path / "retired").mkdir()
+
+    exit_code = main(["ingest", "--data-root", str(tmp_path)], source=ReplaySource(FIXTURES))
+
+    assert exit_code != 0
+    assert "retired" in capsys.readouterr().err
+
+
 def test_all_adds_every_dataset(tmp_path, fake):
     main(["ingest", "--data-root", str(tmp_path), "--season", "2023-24"], source=ReplaySource(FIXTURES))
 
