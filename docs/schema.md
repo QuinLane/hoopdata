@@ -12,7 +12,7 @@ con.sql("select * from player_season_averages").df()
 
 - **Keys** are NBA's own IDs. `game_id` is a string with leading zeros kept (`0022300061`). `player_id` and `team_id` are integers.
 - **`season`** is a string like `2023-24`.
-- **`season_type`** is `Regular Season` or `Playoffs`.
+- **`season_type`** is `Regular Season`, `PlayIn` or `Playoffs`. Play-In games exist from 2019-20 on (including the 2019-20 bubble game NBA labels Play-In); earlier seasons have none.
 - **Stored tables hold raw counts only.** Every percentage is calculated in a view.
 - **Missing values** are `NULL`; integer columns stay integers.
 
@@ -20,12 +20,12 @@ con.sql("select * from player_season_averages").df()
 
 ### `player_box_scores`
 
-One row per player per game. Source: the stats.nba.com league game log (players). Stored as Parquet under `player_box_scores/season=<season>/`.
+One row per player per game. Source: the stats.nba.com league game log (players). Stored as Parquet under `player_box_scores/season=<season>/`, one file per season type (`regular_season.parquet`, `playin.parquet`, `playoffs.parquet`).
 
 | Column | Type | Meaning |
 |---|---|---|
 | `season` | VARCHAR | Season, like `2023-24` |
-| `season_type` | VARCHAR | `Regular Season` or `Playoffs` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
 | `game_id` | VARCHAR | NBA game ID, leading zeros kept |
 | `game_date` | DATE | Date the game was played |
 | `player_id` | BIGINT | NBA player ID |
@@ -65,7 +65,7 @@ One row per game. Derived from the team game log with no extra requests: the tea
 |---|---|---|
 | `game_id` | VARCHAR | NBA game ID, leading zeros kept |
 | `season` | VARCHAR | Season, like `2023-24` |
-| `season_type` | VARCHAR | `Regular Season` or `Playoffs` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
 | `game_date` | DATE | Date the game was played |
 | `neutral_site` | BOOLEAN | Played at a neutral site. When true, home and away only order the teams: the lower team ID is home |
 | `home_team_id` | BIGINT | Home team's NBA team ID |
@@ -150,7 +150,7 @@ One row per team per season and season type.
 
 ### `standings`
 
-Wins and losses per team, season and season type.
+Wins and losses per team, season and season type. Play-In games are left out, as in NBA's standings.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -191,9 +191,24 @@ One row describing the data. It reads `manifest.json` at query time, so it shows
 |---|---|---|
 | `schema_version` | INTEGER | Version of this schema (see below) |
 | `last_updated` | TIMESTAMP WITH TIME ZONE | When an item was last recorded in the manifest |
+| `seasons` | VARCHAR[] | The seasons the data root holds: `['all']` (every season, including future ones), or the fixed list, like `['2022-23', '2023-24']` |
 
 ```sql
-select schema_version, last_updated from hoopdata_info
+select schema_version, last_updated, seasons from hoopdata_info
+```
+
+### `hoopdata_datasets`
+
+One row per dataset in the data root's selection, core included. Like `hoopdata_info`, it reads `manifest.json` at query time. It is written at the end of every ingest. A selected dataset's own views are published once each of its tables has data.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `dataset` | VARCHAR | Dataset name, like `core` |
+| `last_updated` | TIMESTAMP WITH TIME ZONE | When one of the dataset's items was last fetched |
+| `complete` | BOOLEAN | As of the dataset's last ingest, every item in the selection had succeeded: every selected season (with `all`, every season through the latest) and season type, and for core a bio for every player. With `all`, it stays true when a new season starts until the next ingest fetches it |
+
+```sql
+select dataset, last_updated, complete from hoopdata_datasets
 ```
 
 ## Manifest
@@ -204,6 +219,7 @@ select schema_version, last_updated from hoopdata_info
 {
   "schema_version": 1,
   "last_updated": "2026-11-26T11:00:00.123456+00:00",
+  "selection": {"datasets": ["core"], "seasons": ["2022-23", "2023-24"]},
   "items": [
     {
       "table": "player_box_scores",
@@ -215,19 +231,24 @@ select schema_version, last_updated from hoopdata_info
       "error": null
     }
   ],
+  "datasets": [
+    {"dataset": "core", "last_updated": "2026-11-26T11:00:00.123456+00:00", "complete": true}
+  ],
   "views_hash": "..."
 }
 ```
 
 - **`schema_version`**: the version of this schema.
 - **`last_updated`**: UTC time the latest item was recorded.
-- **`items`**: one entry per table, season and season type, holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
+- **`selection`**: what the data root holds, saved by every ingest and added to by `--season`, `--all-seasons` and `--datasets`. `datasets` lists the selected datasets, core first. `seasons` is `"all"` (every season from 1996-97 on, including future ones) or a list of seasons. A selection only grows. Deleting a dataset's folder removes it on the next ingest. A v1 manifest without `selection` is read as core with all seasons.
+- **`items`**: one entry per table, season and season type (no `PlayIn` items before 2019-20), holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
 - **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
-- **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
+- **`datasets`**: each selected dataset's status as of the latest run, read by `hoopdata_datasets`.
+- **`views_hash`**: internal. A fingerprint of the published views, the schema version and the selection, used to decide when `hoopdata.duckdb` must be rebuilt.
 
 ## When `hoopdata.duckdb` is rebuilt
 
-Only when the views or the schema version change, or on the next ingest after the data root moves (the views hold absolute paths). New data needs no rebuild: the views read the Parquet files and the manifest at query time.
+Only when the views, the schema version or the selection change (a season or dataset added, or a dataset's folder deleted), or on the next ingest after the data root moves (the views hold absolute paths). New data needs no rebuild: the views read the Parquet files and the manifest at query time.
 
 ## Schema version
 

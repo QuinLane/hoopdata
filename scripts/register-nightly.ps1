@@ -3,8 +3,9 @@
 Registers (or updates) the nightly hoopdata Task Scheduler job.
 
 .DESCRIPTION
-The task runs `hoopdata ingest --all-seasons` daily at 6am. If the PC was off or
-asleep at 6am, it runs as soon as possible afterwards. The task runs uv directly, so
+The task runs plain `hoopdata ingest` daily at 6am, which keeps the data root's saved
+selection current. If the PC was off or asleep at 6am, it runs as soon as possible
+afterwards. The task runs uv directly, so
 the CLI's exit code becomes the task's Last Run Result (non-zero when items failed).
 
 .PARAMETER DataRoot
@@ -33,7 +34,7 @@ $Uv = (Get-Command uv).Source
 
 $action = New-ScheduledTaskAction `
     -Execute $Uv `
-    -Argument "run --project `"$RepoRoot`" hoopdata ingest --all-seasons --data-root `"$DataRoot`"" `
+    -Argument "run --project `"$RepoRoot`" hoopdata ingest --data-root `"$DataRoot`"" `
     -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -Daily -At 6am
 # Local time without a UTC offset, so the task stays at 6am across daylight saving changes.

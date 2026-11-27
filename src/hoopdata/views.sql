@@ -2,10 +2,25 @@
 -- {root} is replaced with the absolute data root path when the file is built.
 
 create view hoopdata_info as
-select schema_version, last_updated
+select
+    schema_version,
+    last_updated,
+    -- The selection's seasons: ['all'], or the fixed list like ['2022-23', '2023-24'].
+    case
+        when json_type(selection, '$.seasons') = 'ARRAY'
+            then from_json(selection -> '$.seasons', '["VARCHAR"]')
+        else [selection ->> '$.seasons']
+    end as seasons
 from read_json(
     '{root}/manifest.json',
-    columns = {schema_version: 'INTEGER', last_updated: 'TIMESTAMPTZ'}
+    columns = {schema_version: 'INTEGER', last_updated: 'TIMESTAMPTZ', selection: 'JSON'}
+);
+
+create view hoopdata_datasets as
+select unnest(datasets, recursive := true)
+from read_json(
+    '{root}/manifest.json',
+    columns = {datasets: 'STRUCT(dataset VARCHAR, last_updated TIMESTAMPTZ, complete BOOLEAN)[]'}
 );
 
 create view player_box_scores as
@@ -140,6 +155,7 @@ select
     count(*) filter (where wl = 'W') as wins,
     count(*) filter (where wl = 'L') as losses
 from team_box_scores
+where season_type <> 'PlayIn'
 group by season, season_type, team_id;
 
 create view player_teams as
