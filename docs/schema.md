@@ -442,6 +442,34 @@ Each team's coaches per season: every `coach_seasons` column, plus this. Only pu
 |---|---|---|
 | `team_abbreviation` | VARCHAR | Team abbreviation in the team's latest game of the season in `team_box_scores` |
 
+### `assists` (pbp dataset)
+
+One row per assisted made shot: a `Made Shot` action whose `description` ends with the assister, like `(White 1 AST)`. Only published when `pbp` is in the selection.
+
+**Matching assisters.** Play-by-play has no assister ID, only the surname in the description (with any suffix, like `Porter Jr.`, and without accents). It's matched to the scorer's teammates in that game's `player_box_scores`: a teammate matches when their `player_name`, with accents removed, ends in that surname (`Doncic` matches `Luka Dončić`). When exactly one teammate matches, they're the assister. When none or more than one does (two teammates share the surname, or the game's box scores are missing the player), `assist_player_id` is `NULL` and the parsed name is kept.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season`, `season_type` | VARCHAR | The game's season and season type, from `games` |
+| `game_id`, `action_id` | | Key, as in `play_by_play` |
+| `period` | BIGINT | Period, as in `play_by_play` |
+| `clock` | VARCHAR | Time left in the period, as in `play_by_play` |
+| `team_id` | BIGINT | The scorer's team |
+| `player_id` | BIGINT | The scorer (`play_by_play.person_id`) |
+| `assist_player_id` | BIGINT | The assister's NBA player ID; `NULL` when no single teammate matches |
+| `assist_player_name` | VARCHAR | The assister as the description gives them, like `Murray` |
+| `shot_value` | BIGINT | `2` or `3` |
+
+### `assist_pairs` (pbp dataset)
+
+Assist totals per assister and scorer: one row per season, season type, team, assister and scorer, from `assists`. Unresolved assisters (`assist_player_id` `NULL`) are left out. Only published when `pbp` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season`, `season_type`, `team_id`, `assist_player_id`, `player_id` | | Grain; `player_id` is the scorer |
+| `assists` | BIGINT | Made shots the assister set up for the scorer |
+| `points` | BIGINT | Points from those shots (`sum(shot_value)`) |
+
 ### `hoopdata_info`
 
 One row describing the data. It reads `manifest.json` at query time, so it shows the latest run without reopening or rebuilding anything.
