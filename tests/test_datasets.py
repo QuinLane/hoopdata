@@ -35,7 +35,7 @@ class FakeDataset(Dataset):
         )
         self.requests_made = []
 
-    def _fetch(self, source, season, season_type, kind):
+    def _fetch(self, source, store, season, season_type, kind):
         self.requests_made.append((season, season_type))
         return {"score": 7}
 
@@ -123,7 +123,7 @@ def test_all_adds_every_dataset(tmp_path, fake):
 
     main(["ingest", "--data-root", str(tmp_path), "--datasets", "all"], source=ReplaySource(FIXTURES))
 
-    assert manifest(tmp_path)["selection"]["datasets"] == ["core", "advanced", "fake"]
+    assert manifest(tmp_path)["selection"]["datasets"] == ["core", "advanced", "fake", "shots"]
 
 
 def published_views(data_root):
@@ -150,7 +150,7 @@ class Crash(BaseException):
 
 
 class CrashingFakeDataset(FakeDataset):
-    def _fetch(self, source, season, season_type, kind):
+    def _fetch(self, source, store, season, season_type, kind):
         raise Crash()
 
 
@@ -231,7 +231,7 @@ def test_hoopdata_datasets_leaves_out_datasets_not_selected(tmp_path, fake):
 
 
 class FailingFakeDataset(FakeDataset):
-    def _fetch(self, source, season, season_type, kind):
+    def _fetch(self, source, store, season, season_type, kind):
         raise ConnectionError("timed out")
 
 
@@ -282,10 +282,10 @@ class TwoTableFakeDataset(FakeDataset):
             );
         """
 
-    def _fetch(self, source, season, season_type, kind):
+    def _fetch(self, source, store, season, season_type, kind):
         if kind == "extras":
             raise ConnectionError("timed out")
-        return super()._fetch(source, season, season_type, kind)
+        return super()._fetch(source, store, season, season_type, kind)
 
 
 def test_a_datasets_views_wait_until_every_one_of_its_tables_has_data(tmp_path, monkeypatch):

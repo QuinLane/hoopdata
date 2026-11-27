@@ -45,6 +45,26 @@ ADVANCED_BOX_SCORE_TYPES = {
     **dict.fromkeys([column for column in ADVANCED_STAT_COLUMNS if column != "poss"], "Float64"),
 }
 
+# One row per field-goal attempt: the keys, then the kept columns as given.
+SHOT_COLUMNS = [
+    "season", "season_type", "game_id", "game_event_id", "player_id", "team_id",
+    "period", "minutes_remaining", "seconds_remaining", "action_type", "shot_type",
+    "shot_zone_basic", "shot_zone_area", "shot_zone_range", "shot_distance", "loc_x", "loc_y", "shot_made_flag",
+]
+
+SHOT_TYPES = {
+    **dict.fromkeys(
+        ["season", "season_type", "game_id", "action_type", "shot_type", "shot_zone_basic", "shot_zone_area",
+         "shot_zone_range"],
+        "string",
+    ),
+    **dict.fromkeys(
+        ["game_event_id", "player_id", "team_id", "period", "minutes_remaining", "seconds_remaining",
+         "shot_distance", "loc_x", "loc_y", "shot_made_flag"],
+        "Int64",
+    ),
+}
+
 PLAYER_COLUMNS = [
     "player_id", "first_name", "last_name", "display_name", "birthdate",
     "height_in", "weight_lb", "position", "country", "school",
@@ -98,6 +118,14 @@ def _advanced_box_scores(df, season, season_type, columns):
     df["season"] = season
     df["season_type"] = season_type
     return df[columns].astype({column: ADVANCED_BOX_SCORE_TYPES[column] for column in columns})
+
+
+def shots(raws, season, season_type):
+    """Every field-goal attempt in the teams' shot charts ``raws``, keys plus the kept columns, values as given."""
+    df = pd.concat([_result_set(raw) for raw in raws], ignore_index=True)
+    df["season"] = season
+    df["season_type"] = season_type
+    return df[SHOT_COLUMNS].astype(SHOT_TYPES)
 
 
 def _box_scores(df, season, season_type, columns):
