@@ -1,4 +1,7 @@
+import io
 from pathlib import Path
+
+import pytest
 
 from hoopdata.cli import main
 from hoopdata.source import PLAYER, PLAYOFFS, ReplaySource
@@ -42,6 +45,26 @@ def test_ingest_command_reports_a_failed_bio_fetch(tmp_path, monkeypatch, capsys
     assert exit_code == 1
     assert (tmp_path / "hoopdata.duckdb").exists()
     assert "players: FAILED (1 of 53 bios failed, first: ConnectionError: stats.nba.com timed out)" in out
+
+
+def test_ingest_help_lists_the_full_backfill_cost_per_dataset(capsys):
+    with pytest.raises(SystemExit):
+        main(["ingest", "--help"])
+
+    assert "core: about 2,800 requests, roughly 47 min" in " ".join(capsys.readouterr().out.split())
+
+
+def test_ingest_never_prompts(tmp_path, monkeypatch, capsys):
+    def no_prompt(*args):
+        raise AssertionError("ingest prompted")
+
+    monkeypatch.setattr("builtins.input", no_prompt)
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+
+    exit_code = main(["ingest", "--season", "2023-24", "--data-root", str(tmp_path)], source=ReplaySource(FIXTURES))
+
+    assert exit_code == 0
+    assert "About 6 requests" in capsys.readouterr().out
 
 
 def test_plain_ingest_on_an_empty_data_root_is_refused_and_fetches_nothing(tmp_path, monkeypatch, capsys):

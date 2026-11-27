@@ -64,14 +64,14 @@ def test_adding_a_dataset_fetches_it_for_the_seasons_already_held_and_publishes_
     assert manifest(tmp_path)["selection"] == {"datasets": ["core", "fake"], "seasons": ["2022-23", "2023-24"]}
     assert (tmp_path / "fake").is_dir()
     assert fake.requests_made == [
-        ("2022-23", "Regular Season"), ("2022-23", "Playoffs"),
-        ("2023-24", "Regular Season"), ("2023-24", "Playoffs"),
+        ("2022-23", "Regular Season"), ("2022-23", "PlayIn"), ("2022-23", "Playoffs"),
+        ("2023-24", "Regular Season"), ("2023-24", "PlayIn"), ("2023-24", "Playoffs"),
     ]
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         rows = con.execute("select season, season_type, score from fake_scores order by all").fetchall()
     assert rows == [
-        ("2022-23", "Playoffs", 7), ("2022-23", "Regular Season", 7),
-        ("2023-24", "Playoffs", 7), ("2023-24", "Regular Season", 7),
+        ("2022-23", "PlayIn", 7), ("2022-23", "Playoffs", 7), ("2022-23", "Regular Season", 7),
+        ("2023-24", "PlayIn", 7), ("2023-24", "Playoffs", 7), ("2023-24", "Regular Season", 7),
     ]
 
 
@@ -155,7 +155,7 @@ def test_a_dataset_added_in_a_run_that_crashes_before_writing_data_keeps_its_fol
     ingest(ReplaySource(FIXTURES), store, today=SUMMER)
 
     assert manifest(tmp_path)["selection"]["datasets"] == ["core", "fake"]
-    assert fake.requests_made == [("2023-24", "Regular Season"), ("2023-24", "Playoffs")]
+    assert fake.requests_made == [("2023-24", "Regular Season"), ("2023-24", "PlayIn"), ("2023-24", "Playoffs")]
 
 
 def test_the_published_file_is_rebuilt_when_the_selection_changes_and_not_otherwise(tmp_path, fake):
@@ -186,16 +186,15 @@ class CountingSource(ReplaySource):
         return super().game_log(season, season_type, kind)
 
 
-def test_each_dataset_reports_how_many_requests_the_run_will_make(tmp_path, fake):
+def test_the_estimate_counts_each_datasets_requests(tmp_path, fake, capsys):
     store = Store(tmp_path)
     ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=SUMMER)
-    seasons, latest = ["2022-23", "2023-24"], "2023-24"
-
-    # 2023-24 is the latest season, so core refetches its 4 game logs. fake has 2 per season, all missing.
-    assert DATASETS["core"].requests(store, seasons, latest) == 4
-    assert fake.requests(store, seasons, latest) == 4
+    capsys.readouterr()
 
     source = CountingSource(FIXTURES)
     ingest(source, store, datasets=["fake"], today=SUMMER)
-    assert source.game_log_requests == 4
-    assert len(fake.requests_made) == 4
+
+    # 2023-24 is the latest season, so core refetches its 6 game logs. fake has 3 per season, all missing.
+    assert "About 12 requests, roughly 12 s (core: 6 · fake: 6)" in capsys.readouterr().out
+    assert source.game_log_requests == 6
+    assert len(fake.requests_made) == 6

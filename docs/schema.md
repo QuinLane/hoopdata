@@ -12,7 +12,7 @@ con.sql("select * from player_season_averages").df()
 
 - **Keys** are NBA's own IDs. `game_id` is a string with leading zeros kept (`0022300061`). `player_id` and `team_id` are integers.
 - **`season`** is a string like `2023-24`.
-- **`season_type`** is `Regular Season` or `Playoffs`.
+- **`season_type`** is `Regular Season`, `PlayIn` or `Playoffs`. Play-In games exist from 2019-20 on (including the 2019-20 bubble game NBA labels Play-In); earlier seasons have none.
 - **Stored tables hold raw counts only.** Every percentage is calculated in a view.
 - **Missing values** are `NULL`; integer columns stay integers.
 
@@ -20,12 +20,12 @@ con.sql("select * from player_season_averages").df()
 
 ### `player_box_scores`
 
-One row per player per game. Source: the stats.nba.com league game log (players). Stored as Parquet under `player_box_scores/season=<season>/`.
+One row per player per game. Source: the stats.nba.com league game log (players). Stored as Parquet under `player_box_scores/season=<season>/`, one file per season type (`regular_season.parquet`, `playin.parquet`, `playoffs.parquet`).
 
 | Column | Type | Meaning |
 |---|---|---|
 | `season` | VARCHAR | Season, like `2023-24` |
-| `season_type` | VARCHAR | `Regular Season` or `Playoffs` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
 | `game_id` | VARCHAR | NBA game ID, leading zeros kept |
 | `game_date` | DATE | Date the game was played |
 | `player_id` | BIGINT | NBA player ID |
@@ -65,7 +65,7 @@ One row per game. Derived from the team game log with no extra requests: the tea
 |---|---|---|
 | `game_id` | VARCHAR | NBA game ID, leading zeros kept |
 | `season` | VARCHAR | Season, like `2023-24` |
-| `season_type` | VARCHAR | `Regular Season` or `Playoffs` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
 | `game_date` | DATE | Date the game was played |
 | `neutral_site` | BOOLEAN | Played at a neutral site. When true, home and away only order the teams: the lower team ID is home |
 | `home_team_id` | BIGINT | Home team's NBA team ID |
@@ -150,7 +150,7 @@ One row per team per season and season type.
 
 ### `standings`
 
-Wins and losses per team, season and season type.
+Wins and losses per team, season and season type. Play-In games are left out, as in NBA's standings.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -221,7 +221,7 @@ select schema_version, last_updated from hoopdata_info
 
 - **`schema_version`**: the version of this schema.
 - **`last_updated`**: UTC time the latest item was recorded.
-- **`items`**: one entry per table, season and season type, holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
+- **`items`**: one entry per table, season and season type (no `PlayIn` items before 2019-20), holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
 - **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
 - **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
 

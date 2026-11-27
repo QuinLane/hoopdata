@@ -140,6 +140,7 @@ select
     count(*) filter (where wl = 'W') as wins,
     count(*) filter (where wl = 'L') as losses
 from team_box_scores
+where season_type <> 'PlayIn'
 group by season, season_type, team_id;
 
 create view player_teams as

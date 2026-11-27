@@ -8,7 +8,7 @@ import pytest
 
 from hoopdata import transform
 from hoopdata.ingest import EmptySelectionError, ingest
-from hoopdata.source import PLAYER, PLAYOFFS, REGULAR_SEASON, ReplaySource
+from hoopdata.source import PLAY_IN, PLAYER, PLAYOFFS, REGULAR_SEASON, ReplaySource
 from hoopdata.store import ALL_SEASONS, Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -91,12 +91,12 @@ def test_a_failed_item_is_recorded_and_the_other_items_complete(tmp_path):
     assert [(i.table, i.season_type, i.status) for i in report.items if i.status != "succeeded"] == [
         ("player_box_scores", "Playoffs", "failed")
     ]
-    assert len(report.items) == 7
+    assert len(report.items) == 10
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
         games = con.execute("select count(*) from games").fetchone()[0]
-    assert player_rows == 64
-    assert games == 9
+    assert player_rows == 64 + 4
+    assert games == 10
 
 
 def test_a_second_run_retries_only_the_failed_item(tmp_path):
@@ -114,7 +114,7 @@ def test_a_second_run_retries_only_the_failed_item(tmp_path):
     assert {i["status"] for i in manifest_items(tmp_path).values()} == {"succeeded"}
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
-    assert player_rows == 64 + 19
+    assert player_rows == 64 + 4 + 19
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="only Windows refuses to replace a file that is open")
@@ -136,7 +136,7 @@ def test_a_parquet_file_held_open_by_a_consumer_fails_its_item_and_leaves_no_par
     assert not list(tmp_path.rglob("*.tmp"))
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         player_rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
-    assert player_rows == 64 + 19
+    assert player_rows == 64 + 4 + 19
 
 
 def test_each_run_writes_its_own_log_file(tmp_path):
@@ -269,7 +269,7 @@ def test_published_file_holds_only_views_that_work_from_any_directory(tmp_path, 
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
 
     assert table_types == {"VIEW"}
-    assert rows == 64 + 19
+    assert rows == 64 + 4 + 19
 
 
 def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
@@ -280,7 +280,7 @@ def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
 
-    assert rows == 64 + 19
+    assert rows == 64 + 4 + 19
     assert not list(tmp_path.rglob("*.tmp"))
 
 
@@ -458,9 +458,12 @@ def test_manifest_records_each_item_and_the_schema_version(tmp_path):
     assert set(items) == {
         ("player_box_scores", "2023-24", "Regular Season"),
         ("player_box_scores", "2023-24", "Playoffs"),
+        ("player_box_scores", "2023-24", "PlayIn"),
         ("team_box_scores", "2023-24", "Regular Season"),
+        ("team_box_scores", "2023-24", "PlayIn"),
         ("team_box_scores", "2023-24", "Playoffs"),
         ("games", "2023-24", "Regular Season"),
+        ("games", "2023-24", "PlayIn"),
         ("games", "2023-24", "Playoffs"),
         ("players", None, None),
     }
@@ -509,13 +512,14 @@ def test_ingest_after_the_data_root_moves_rebuilds_the_file(tmp_path):
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
         schema_version = con.execute("select schema_version from hoopdata_info").fetchone()[0]
 
-    assert rows == 64 + 19
+    assert rows == 64 + 4 + 19
     assert schema_version == 1
 
 
 def test_standings_count_wins_and_losses_per_season_type(db):
     # Fixture games: DEN beat DAL and LAC at home, lost at NOP, won at IND, then beat LAL in the playoffs.
     # Siakam's games: TOR lost at UTA and to BOS at home, then IND lost at POR, at PHX and to DEN at home.
+    # LAL's Play-In win at NOP is left out, as in NBA's standings.
     rows = db.execute(
         """
         select season_type, team_id, wins, losses from standings
@@ -557,6 +561,7 @@ def test_games_have_one_row_each_with_home_and_away_from_the_matchup(db):
         ("0022300604", "2023-24", "Regular Season", date(2024, 1, 21), SUNS, PACERS, 117, 110),
         ("0022300614", "2023-24", "Regular Season", date(2024, 1, 23), PACERS, DENVER, 109, 114),
         ("0042300151", "2023-24", "Playoffs", date(2024, 4, 20), DENVER, LAKERS, 114, 103),
+        ("0052300111", "2023-24", "PlayIn", date(2024, 4, 16), PELICANS, LAKERS, 106, 110),
     ]
     assert db.execute("select distinct neutral_site from games").fetchall() == [(False,)]
 
@@ -596,7 +601,7 @@ def test_every_game_in_the_player_box_scores_has_exactly_one_games_row(tmp_path)
             """
         ).fetchall()
 
-    assert len(rows_per_game) == 11
+    assert len(rows_per_game) == 13
     assert {count for _, count in rows_per_game} == {1}
 
 
@@ -642,10 +647,13 @@ class BackfillSource(ReplaySource):
     def __init__(self, fixtures_dir):
         super().__init__(fixtures_dir)
         self.seasons_requested = []
+        self.play_in_seasons_requested = []
 
     def game_log(self, season, season_type, kind):
         if season_type == REGULAR_SEASON and kind == PLAYER:
             self.seasons_requested.append(season)
+        if season_type == PLAY_IN and kind == PLAYER:
+            self.play_in_seasons_requested.append(season)
         if season not in ("2022-23", "2023-24"):
             season = "2022-23"
         return super().game_log(season, season_type, kind)
@@ -822,3 +830,126 @@ def test_a_v1_manifest_without_a_selection_is_saved_as_core_with_all_seasons(tmp
 
     assert selection(tmp_path) == {"datasets": ["core"], "seasons": "all"}
     assert source.seasons_requested == ["2024-25"]
+
+
+class FailingPlayoffsAndJokicSource(FailingSource):
+    """Replay source that fails the player playoffs game log and Jokic's bio."""
+
+    def __init__(self, fixtures_dir):
+        super().__init__(fixtures_dir, failing=[(PLAYOFFS, PLAYER)])
+
+    def player_info(self, player_id):
+        if player_id == JOKIC:
+            raise ConnectionError("stats.nba.com timed out")
+        return super().player_info(player_id)
+
+
+def test_the_estimate_counts_one_request_per_failed_game_log_and_missing_bio(tmp_path, capsys):
+    store = Store(tmp_path)
+    ingest(FailingPlayoffsAndJokicSource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 11, 26))
+    capsys.readouterr()
+
+    ingest(ReplaySource(FIXTURES), store, today=date(2024, 11, 26))
+
+    assert "About 2 requests, roughly 2 s (core: 2)" in capsys.readouterr().out
+
+
+class PrintedBeforeRequestSource(ReplaySource):
+    """Replay source that captures what has been printed when the first request is made."""
+
+    def __init__(self, fixtures_dir, capsys):
+        super().__init__(fixtures_dir)
+        self.capsys = capsys
+        self.printed_before_first_request = None
+
+    def game_log(self, season, season_type, kind):
+        if self.printed_before_first_request is None:
+            self.printed_before_first_request = self.capsys.readouterr().out
+        return super().game_log(season, season_type, kind)
+
+
+def test_refetching_only_the_latest_season_prints_its_small_estimate_before_any_request(tmp_path, capsys):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=date(2024, 7, 1))
+    capsys.readouterr()
+
+    source = PrintedBeforeRequestSource(FIXTURES, capsys)
+    ingest(source, store, today=date(2024, 7, 2))
+
+    assert "About 6 requests, roughly 6 s (core: 6)" in source.printed_before_first_request
+
+
+def test_a_first_all_seasons_run_estimates_one_request_per_game_log_in_minutes(tmp_path, capsys):
+    ingest(BackfillSource(FIXTURES), Store(tmp_path), seasons=ALL_SEASONS, today=date(2024, 11, 26))
+
+    assert "About 128 requests, roughly 2 min (core: 128)" in capsys.readouterr().out
+
+
+def test_play_in_games_are_stored_as_their_own_season_type(db):
+    # Fixture Play-In game: the Lakers won at New Orleans, 110-106.
+    game = db.execute(
+        "select game_id, season_type, home_team_id, away_team_id, home_pts, away_pts from games where game_id = '0052300111'"
+    ).fetchone()
+    team_rows = db.execute(
+        "select season_type, team_id, pts from team_box_scores where game_id = '0052300111' order by team_id"
+    ).fetchall()
+    player_rows = db.execute(
+        "select distinct season_type from player_box_scores where game_id = '0052300111'"
+    ).fetchall()
+
+    assert game == ("0052300111", "PlayIn", PELICANS, LAKERS, 106, 110)
+    assert team_rows == [("PlayIn", PELICANS, 106), ("PlayIn", LAKERS, 110)]
+    assert player_rows == [("PlayIn",)]
+
+
+def test_play_in_is_fetched_only_from_2019_20_and_earlier_seasons_are_complete_without_it(tmp_path):
+    store = Store(tmp_path)
+    backfill = BackfillSource(FIXTURES)
+    ingest(backfill, store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
+
+    nightly = BackfillSource(FIXTURES)
+    ingest(nightly, store, today=date(2024, 7, 2))
+
+    assert backfill.play_in_seasons_requested == ["2019-20", "2020-21", "2021-22", "2022-23", "2023-24"]
+    assert nightly.seasons_requested == ["2023-24"]
+    assert ("player_box_scores", "2018-19", "PlayIn") not in manifest_items(tmp_path)
+
+
+class NoPlayInYetSource(ReplaySource):
+    """Replay source whose Play-In game logs have no rows yet, as the current season's do until April."""
+
+    def game_log(self, season, season_type, kind):
+        raw = super().game_log(season, season_type, kind)
+        if season_type == PLAY_IN:
+            raw["resultSets"][0]["rowSet"] = []
+        return raw
+
+
+def test_a_play_in_with_no_games_yet_is_recorded_as_succeeded(tmp_path):
+    report = ingest(NoPlayInYetSource(FIXTURES), Store(tmp_path), seasons=["2023-24"])
+
+    items = manifest_items(tmp_path)
+    assert report.failed == []
+    for table in ["player_box_scores", "team_box_scores", "games"]:
+        assert (items[(table, "2023-24", "PlayIn")]["status"], items[(table, "2023-24", "PlayIn")]["rows"]) == (
+            "succeeded", 0
+        ), table
+
+
+ZION = 1629627
+
+
+def test_season_averages_keep_play_in_as_its_own_rows(db):
+    # Zion scored 26 against Denver in the regular season and 40 in the Play-In.
+    player_rows = db.execute(
+        "select season_type, games_played, pts from player_season_averages where player_id = ? order by season_type",
+        [ZION],
+    ).fetchall()
+    # The Pelicans scored 115 against Denver in the regular season and 106 in the Play-In.
+    team_rows = db.execute(
+        "select season_type, games_played, pts from team_season_averages where team_id = ? order by season_type",
+        [PELICANS],
+    ).fetchall()
+
+    assert player_rows == [("PlayIn", 1, 40.0), ("Regular Season", 1, 26.0)]
+    assert team_rows == [("PlayIn", 1, 106.0), ("Regular Season", 1, 115.0)]

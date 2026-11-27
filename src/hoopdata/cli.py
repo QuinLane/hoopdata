@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from hoopdata.ingest import EmptySelectionError, UnknownDatasetError, ingest
+from hoopdata.ingest import EmptySelectionError, UnknownDatasetError, full_backfill_costs, ingest
 from hoopdata.source import NbaApiSource
 from hoopdata.store import ALL_SEASONS, Store
 
@@ -22,7 +22,10 @@ def main(argv=None, source=None):
     )
     ingest_parser.add_argument(
         "--datasets",
-        help="add datasets, as a comma-separated list or all, to the data root's selection",
+        help=(
+            "add datasets, as a comma-separated list or all, to the data root's selection. "
+            f"Full-backfill cost per dataset, at about 1 s per request: {full_backfill_costs()}"
+        ),
     )
     ingest_parser.add_argument(
         "--data-root",

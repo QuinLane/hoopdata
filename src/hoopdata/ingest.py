@@ -9,7 +9,7 @@ import pandas as pd
 from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
-from hoopdata.source import PLAYER, SEASON_TYPES, TEAM
+from hoopdata.source import PLAY_IN, PLAYER, SEASON_TYPES, TEAM
 from hoopdata.store import ALL_SEASONS, CORE, FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
@@ -20,8 +20,18 @@ TEAMS = "teams"
 
 FIRST_SEASON_START_YEAR = 1996
 
+# Play-In games only exist from this season on, so earlier seasons never get a Play-In item.
+FIRST_PLAY_IN_SEASON = "2019-20"
+
 # Bios are written to players.parquet after every this many players.
 BIOS_PER_WRITE = 20
+
+# The source paces requests about this far apart, which the time estimate assumes.
+SECONDS_PER_REQUEST = 1
+
+# Rough requests for each dataset's full backfill of every season, shown in --help.
+# Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player bios.
+FULL_BACKFILL_REQUESTS = {CORE: 2_800}
 
 log = logging.getLogger(__name__)
 
@@ -59,17 +69,14 @@ class Dataset:
             for season_type, kind, tables in self._game_logs_to_fetch(store, season, season == latest)
         ]
 
-    def requests(self, store, seasons, latest):
-        """How many requests fetching ``seasons`` will make."""
-        return len(self.to_fetch(store, seasons, latest))
-
     def _game_logs_to_fetch(self, store, season, refetch_complete):
+        season_types = _season_types(season)
         all_items = {
-            (table, season_type) for season_type in SEASON_TYPES for tables in self.tables.values() for table, _ in tables
+            (table, season_type) for season_type in season_types for tables in self.tables.values() for table, _ in tables
         }
         to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
         game_logs = []
-        for season_type in SEASON_TYPES:
+        for season_type in season_types:
             for kind, tables in self.tables.items():
                 tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
                 if tables:
@@ -152,12 +159,15 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     today = today or date.today()
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
+    game_logs = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
+    requests = {name: len(to_fetch) for name, to_fetch in game_logs.items()}
+    requests[CORE] += len(_players_without_bios(store))
+    print(_estimate(requests))
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
-        for name in selection["datasets"]:
-            dataset = DATASETS[name]
-            for season, season_type, kind, tables in dataset.to_fetch(store, selected, latest):
-                _fetch_game_log(source, store, report, dataset, season, season_type, kind, tables)
+        for name, to_fetch in game_logs.items():
+            for season, season_type, kind, tables in to_fetch:
+                _fetch_game_log(source, store, report, DATASETS[name], season, season_type, kind, tables)
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
         store.publish([DATASETS[name].views for name in selection["datasets"]])
@@ -196,6 +206,32 @@ def _add_datasets(selection, datasets):
     return {**selection, "datasets": sorted(names, key=lambda name: (name != CORE, name))}
 
 
+def _estimate(requests):
+    """A line like ``About 38,400 requests, roughly 11 h (pbp: 37,900 · core: 500)`` from requests per dataset.
+
+    Bios of players first seen in this run's game logs can't be known yet, so they aren't counted.
+    """
+    total = sum(requests.values())
+    breakdown = " · ".join(f"{dataset}: {count:,}" for dataset, count in requests.items())
+    return f"About {total:,} requests, roughly {_duration(total * SECONDS_PER_REQUEST)} ({breakdown})"
+
+
+def full_backfill_costs():
+    """Each dataset's full-backfill cost, like ``core: about 2,800 requests, roughly 47 min``."""
+    return "; ".join(
+        f"{dataset}: about {count:,} requests, roughly {_duration(count * SECONDS_PER_REQUEST)}"
+        for dataset, count in FULL_BACKFILL_REQUESTS.items()
+    )
+
+
+def _duration(seconds):
+    if seconds < 60:
+        return f"{seconds} s"
+    if seconds < 60 * 60:
+        return f"{round(seconds / 60)} min"
+    return f"{round(seconds / 60 / 60)} h"
+
+
 @contextmanager
 def _logging_to(path):
     """Send this module's log to ``path`` while the block runs."""
@@ -208,6 +244,11 @@ def _logging_to(path):
     finally:
         log.removeHandler(handler)
         handler.close()
+
+
+def _season_types(season):
+    """The season types ``season`` has: Play-In only from 2019-20 on."""
+    return [t for t in SEASON_TYPES if t != PLAY_IN or season >= FIRST_PLAY_IN_SEASON]
 
 
 def _fetch_game_log(source, store, report, dataset, season, season_type, kind, tables):
@@ -266,8 +307,7 @@ def _add_new_players(source, store, report):
     is logged and skipped, and the ``players`` item records how many failed.
     """
     stored = store.read_table(PLAYERS)
-    stored_ids = set(stored["player_id"]) if stored is not None else set()
-    new_ids = sorted(store.distinct_values(PLAYER_BOX_SCORES, "player_id") - stored_ids)
+    new_ids = _players_without_bios(store)
     if not new_ids:
         return
     try:
@@ -289,6 +329,13 @@ def _add_new_players(source, store, report):
         _record(store, report, Item(PLAYERS, None, None, FAILED, rows=rows, error=error))
     else:
         _record(store, report, Item(PLAYERS, None, None, SUCCEEDED, rows=rows))
+
+
+def _players_without_bios(store):
+    """The ids of players in the stored box scores who have no bio yet, sorted."""
+    stored = store.read_table(PLAYERS)
+    stored_ids = set(stored["player_id"]) if stored is not None else set()
+    return sorted(store.distinct_values(PLAYER_BOX_SCORES, "player_id") - stored_ids)
 
 
 def _fetch_bios(source, player_ids):
