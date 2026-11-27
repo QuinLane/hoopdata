@@ -5,7 +5,7 @@ import duckdb
 import pytest
 
 from hoopdata.ingest import ingest
-from hoopdata.source import ReplaySource
+from hoopdata.source import PLAYER, ReplaySource
 from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -138,18 +138,13 @@ class BackfillSource(ReplaySource):
         except FileNotFoundError:
             return super().game_log("2022-23", season_type, kind)
 
-    def player_advanced_game_log(self, season, season_type):
-        self.advanced_requests.append((season, season_type))
+    def advanced_box_scores(self, season, season_type, kind):
+        if kind == PLAYER:
+            self.advanced_requests.append((season, season_type))
         try:
-            return super().player_advanced_game_log(season, season_type)
+            return super().advanced_box_scores(season, season_type, kind)
         except FileNotFoundError:
-            return super().player_advanced_game_log("2022-23", season_type)
-
-    def team_advanced_game_log(self, season, season_type):
-        try:
-            return super().team_advanced_game_log(season, season_type)
-        except FileNotFoundError:
-            return super().team_advanced_game_log("2022-23", season_type)
+            return super().advanced_box_scores("2022-23", season_type, kind)
 
 
 def test_play_in_is_its_own_season_type_and_is_never_requested_before_2019_20(tmp_path):
@@ -178,11 +173,11 @@ class FailingAdvancedPlayoffsSource(BackfillSource):
         super().__init__(fixtures_dir)
         self.failing = failing
 
-    def player_advanced_game_log(self, season, season_type):
-        if self.failing and season_type == "Playoffs":
+    def advanced_box_scores(self, season, season_type, kind):
+        if self.failing and kind == PLAYER and season_type == "Playoffs":
             self.advanced_requests.append((season, season_type))
             raise ConnectionError("stats.nba.com timed out")
-        return super().player_advanced_game_log(season, season_type)
+        return super().advanced_box_scores(season, season_type, kind)
 
 
 def test_a_failed_advanced_item_is_retried_and_succeeded_ones_are_refetched_only_for_the_latest_season(tmp_path):

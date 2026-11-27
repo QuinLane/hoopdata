@@ -113,11 +113,7 @@ DATASETS = {
             PLAYER: [(PLAYER_ADVANCED_BOX_SCORES, transform.player_advanced_box_scores)],
             TEAM: [(TEAM_ADVANCED_BOX_SCORES, transform.team_advanced_box_scores)],
         },
-        lambda source, season, season_type, kind: (
-            source.player_advanced_game_log(season, season_type)
-            if kind == PLAYER
-            else source.team_advanced_game_log(season, season_type)
-        ),
+        lambda source, season, season_type, kind: source.advanced_box_scores(season, season_type, kind),
         files("hoopdata").joinpath("advanced_views.sql").read_text(encoding="utf-8"),
     ),
 }
