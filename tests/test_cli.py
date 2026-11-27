@@ -42,3 +42,16 @@ def test_ingest_command_reports_a_failed_bio_fetch(tmp_path, monkeypatch, capsys
     assert exit_code == 1
     assert (tmp_path / "hoopdata.duckdb").exists()
     assert "players: FAILED (1 of 53 bios failed, first: ConnectionError: stats.nba.com timed out)" in out
+
+
+def test_plain_ingest_on_an_empty_data_root_is_refused_and_fetches_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("NBA_DATA_ROOT", str(tmp_path))
+    source = FailingPlayoffsSource(FIXTURES)
+
+    exit_code = main(["ingest"], source=source)
+
+    assert exit_code != 0
+    err = capsys.readouterr().err
+    assert "--season" in err and "--all-seasons" in err
+    assert not (tmp_path / "manifest.json").exists()
+    assert not (tmp_path / "hoopdata.duckdb").exists()

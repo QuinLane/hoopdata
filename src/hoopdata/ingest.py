@@ -9,7 +9,7 @@ from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
 from hoopdata.source import PLAYER, SEASON_TYPES, TEAM
-from hoopdata.store import FAILED, SUCCEEDED
+from hoopdata.store import ALL_SEASONS, CORE, FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
 TEAM_BOX_SCORES = "team_box_scores"
@@ -29,6 +29,10 @@ TABLES = {
     PLAYER: [(PLAYER_BOX_SCORES, transform.player_box_scores)],
     TEAM: [(TEAM_BOX_SCORES, transform.team_box_scores), (GAMES, transform.games)],
 }
+
+
+class EmptySelectionError(Exception):
+    """Plain ``ingest`` on a data root with no selection yet: there is nothing to keep current."""
 
 
 @dataclass
@@ -60,28 +64,42 @@ class Report:
 def ingest(source, store, seasons=None, today=None):
     """Fetch each season's player and team box scores, bios for new players and the team list, and publish the views.
 
-    A failed item (table + season + season type) is recorded and skipped, and the run continues.
-    A season with failed or missing items is resumed: only those items are fetched again, and
-    every player in the stored box scores without a bio gets one.
+    The data root remembers its selection (ADR 0002). ``seasons`` adds to it: a list of seasons, or
+    ``"all"`` for every season from 1996-97 on, including future ones. With no ``seasons`` the saved
+    selection is kept as it is, and an empty data root raises ``EmptySelectionError``.
 
-    Passing ``seasons`` forces a refetch of those seasons. With no ``seasons``, every season from
-    1996-97 through the latest one (the season containing ``today``) is considered: the latest is
-    refetched every run, and a completed older season is skipped.
+    Every run fetches the failed or missing items of the selected seasons, and refetches the latest
+    season (the one containing ``today``) if the selection includes it. A failed item (table +
+    season + season type) is recorded and skipped, and the run continues. Every player in the stored
+    box scores without a bio gets one.
     """
-    if seasons is None:
-        seasons = _all_seasons(today or date.today())
-        refetch = {seasons[-1]}
-    else:
-        refetch = set(seasons)
+    selection = _add_seasons(store.read_selection(), seasons)
+    store.write_selection(selection)
+    today = today or date.today()
+    latest = _season(_latest_season_start_year(today))
+    selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
-        for season in seasons:
-            for season_type, kind, tables in _game_logs_to_fetch(store, season, season in refetch):
+        for season in selected:
+            for season_type, kind, tables in _game_logs_to_fetch(store, season, season == latest):
                 _fetch_game_log(source, store, report, season, season_type, kind, tables)
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
         store.publish()
     return report
+
+
+def _add_seasons(selection, seasons):
+    """``selection`` with ``seasons`` added. A selection only grows: ``"all"`` stays ``"all"``."""
+    if selection is None:
+        if seasons is None:
+            raise EmptySelectionError("This data root has no selection yet. Pass --season or --all-seasons.")
+        selection = {"datasets": [CORE], "seasons": []}
+    if seasons is None or selection["seasons"] == ALL_SEASONS:
+        return selection
+    if seasons == ALL_SEASONS:
+        return {**selection, "seasons": ALL_SEASONS}
+    return {**selection, "seasons": sorted(set(selection["seasons"]) | set(seasons))}
 
 
 @contextmanager

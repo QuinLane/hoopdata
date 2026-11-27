@@ -7,9 +7,9 @@ import duckdb
 import pytest
 
 from hoopdata import transform
-from hoopdata.ingest import ingest
+from hoopdata.ingest import EmptySelectionError, ingest
 from hoopdata.source import PLAYER, PLAYOFFS, REGULAR_SEASON, ReplaySource
-from hoopdata.store import Store
+from hoopdata.store import ALL_SEASONS, Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
 JOKIC = 203999
@@ -120,12 +120,12 @@ def test_a_second_run_retries_only_the_failed_item(tmp_path):
 @pytest.mark.skipif(sys.platform != "win32", reason="only Windows refuses to replace a file that is open")
 def test_a_parquet_file_held_open_by_a_consumer_fails_its_item_and_leaves_no_partial_file(tmp_path):
     store = Store(tmp_path)
-    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
-    ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), store, seasons=["2023-24"])
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 7, 1))
+    ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), store, today=date(2024, 7, 1))
 
     held = tmp_path / "player_box_scores" / "season=2023-24" / "playoffs.parquet"
     with open(held, "rb"):
-        report = ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+        report = ingest(ReplaySource(FIXTURES), store, today=date(2024, 7, 1))
 
     assert [(i.table, i.season_type, i.status) for i in report.items] == [
         ("player_box_scores", "Playoffs", "failed")
@@ -274,8 +274,8 @@ def test_published_file_holds_only_views_that_work_from_any_directory(tmp_path, 
 
 def test_reingesting_a_season_replaces_it_rather_than_duplicating(tmp_path):
     store = Store(tmp_path)
-    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
-    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 7, 1))
+    ingest(ReplaySource(FIXTURES), store, today=date(2024, 7, 2))
 
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         rows = con.execute("select count(*) from player_box_scores").fetchone()[0]
@@ -336,12 +336,12 @@ def test_blank_heights_and_weights_are_stored_as_empty(tmp_path):
 
 def test_player_bios_are_fetched_only_for_players_not_yet_stored(tmp_path):
     store = Store(tmp_path)
-    ingest(CountingSource(FIXTURES, hidden_player_ids=[JOKIC]), store, seasons=["2023-24"])
+    ingest(CountingSource(FIXTURES, hidden_player_ids=[JOKIC]), store, seasons=["2023-24"], today=date(2024, 7, 1))
 
     unchanged = CountingSource(FIXTURES, hidden_player_ids=[JOKIC])
-    ingest(unchanged, store, seasons=["2023-24"])
+    ingest(unchanged, store, today=date(2024, 7, 1))
     with_jokic = CountingSource(FIXTURES)
-    ingest(with_jokic, store, seasons=["2023-24"])
+    ingest(with_jokic, store, today=date(2024, 7, 1))
 
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         players = con.execute("select count(*), count(distinct player_id) from players").fetchone()
@@ -491,7 +491,7 @@ def test_later_ingest_updates_hoopdata_info_without_rebuilding_the_file(tmp_path
         first = con.execute("select last_updated from hoopdata_info").fetchone()[0]
     built = database.stat().st_mtime_ns
 
-    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"])
+    ingest(ReplaySource(FIXTURES), store, today=date(2024, 7, 1))
     with duckdb.connect(str(database), read_only=True) as con:
         second = con.execute("select last_updated from hoopdata_info").fetchone()[0]
 
@@ -662,7 +662,7 @@ ALL_SEASONS_TO_2023_24 = [
 def test_all_seasons_run_covers_1996_97_through_the_latest_season(tmp_path):
     source = BackfillSource(FIXTURES)
 
-    ingest(source, Store(tmp_path), today=date(2024, 11, 26))
+    ingest(source, Store(tmp_path), seasons=ALL_SEASONS, today=date(2024, 11, 26))
 
     assert source.seasons_requested == ALL_SEASONS_TO_2023_24 + ["2024-25"]
 
@@ -670,7 +670,7 @@ def test_all_seasons_run_covers_1996_97_through_the_latest_season(tmp_path):
 def test_in_summer_only_the_season_that_just_ended_is_refetched(tmp_path):
     store = Store(tmp_path)
     backfill = BackfillSource(FIXTURES)
-    ingest(backfill, store, today=date(2024, 7, 1))
+    ingest(backfill, store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
 
     nightly = BackfillSource(FIXTURES)
     ingest(nightly, store, today=date(2024, 7, 2))
@@ -684,7 +684,7 @@ def test_all_seasons_run_fetches_older_seasons_that_are_missing(tmp_path):
     ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"])
 
     source = BackfillSource(FIXTURES)
-    ingest(source, store, today=date(2024, 7, 1))
+    ingest(source, store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
 
     assert source.seasons_requested == ALL_SEASONS_TO_2023_24[:-2] + ["2023-24"]
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
@@ -692,16 +692,133 @@ def test_all_seasons_run_fetches_older_seasons_that_are_missing(tmp_path):
     assert seasons == len(ALL_SEASONS_TO_2023_24)
 
 
-def test_passing_a_completed_season_refetches_it(tmp_path):
+def selection(data_root):
+    return json.loads((Path(data_root) / "manifest.json").read_text(encoding="utf-8"))["selection"]
+
+
+def test_plain_ingest_on_an_empty_data_root_is_refused_and_fetches_nothing(tmp_path):
+    source = BackfillSource(FIXTURES)
+
+    with pytest.raises(EmptySelectionError, match="--season or --all-seasons"):
+        ingest(source, Store(tmp_path))
+
+    assert source.seasons_requested == []
+    assert not (tmp_path / "manifest.json").exists()
+
+
+def test_a_season_on_an_empty_data_root_is_saved_as_a_fixed_list_and_fetched(tmp_path):
+    source = BackfillSource(FIXTURES)
+
+    ingest(source, Store(tmp_path), seasons=["2023-24"], today=date(2024, 11, 26))
+
+    assert selection(tmp_path) == {"datasets": ["core"], "seasons": ["2023-24"]}
+    assert source.seasons_requested == ["2023-24"]
+
+
+def test_passing_a_completed_season_fetches_nothing_already_succeeded(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    source = FailingSource(FIXTURES)
+    ingest(source, store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    assert source.game_log_requests == []
+    assert selection(tmp_path)["seasons"] == ["2022-23"]
+
+
+def test_passing_a_season_fetches_only_its_failed_items(tmp_path):
+    store = Store(tmp_path)
+    ingest(FailingSource(FIXTURES, failing=[(PLAYOFFS, PLAYER)]), store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    source = FailingSource(FIXTURES)
+    ingest(source, store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    assert source.game_log_requests == [("2022-23", "Playoffs", "player")]
+
+
+def test_passing_a_season_with_all_seasons_selected_keeps_all_and_fetches_nothing_already_succeeded(tmp_path):
+    store = Store(tmp_path)
+    ingest(BackfillSource(FIXTURES), store, seasons=ALL_SEASONS, today=date(2024, 11, 26))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, seasons=["2022-23"], today=date(2024, 11, 26))
+
+    assert source.seasons_requested == ["2024-25"]
+    assert selection(tmp_path)["seasons"] == "all"
+
+
+def test_adding_a_season_to_a_fixed_list_fetches_only_the_new_season(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 11, 26))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, seasons=["2023-24"], today=date(2024, 11, 26))
+
+    assert source.seasons_requested == ["2023-24"]
+    assert selection(tmp_path)["seasons"] == ["2022-23", "2023-24"]
+
+
+def test_all_seasons_widens_a_fixed_list_to_all(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=date(2024, 7, 1))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
+
+    assert selection(tmp_path)["seasons"] == "all"
+    assert source.seasons_requested == ALL_SEASONS_TO_2023_24[:-2] + ["2023-24"]
+
+
+def test_a_fixed_list_does_not_gain_a_new_season(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 7, 1))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, today=date(2024, 11, 26))
+
+    assert source.seasons_requested == []
+    assert selection(tmp_path)["seasons"] == ["2023-24"]
+
+
+def test_all_seasons_gains_a_new_season(tmp_path):
+    store = Store(tmp_path)
+    ingest(BackfillSource(FIXTURES), store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, today=date(2024, 11, 26))
+
+    assert source.seasons_requested == ["2024-25"]
+
+
+def test_plain_ingest_refetches_the_latest_season_when_the_selection_includes_it(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=date(2024, 7, 1))
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, today=date(2024, 7, 2))
+
+    assert source.seasons_requested == ["2023-24"]
+
+
+def test_plain_ingest_leaves_a_completed_older_season_alone(tmp_path):
     store = Store(tmp_path)
     ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
 
     source = BackfillSource(FIXTURES)
-    ingest(source, store, seasons=["2022-23"], today=date(2024, 7, 1))
+    ingest(source, store, today=date(2024, 7, 2))
 
-    assert source.seasons_requested == ["2022-23"]
-    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
-        rows = con.execute(
-            "select season_type, count(*) from player_box_scores group by season_type order by season_type"
-        ).fetchall()
-    assert rows == [("Playoffs", 16), ("Regular Season", 27)]
+    assert source.seasons_requested == []
+
+
+def test_a_v1_manifest_without_a_selection_is_saved_as_core_with_all_seasons(tmp_path):
+    store = Store(tmp_path)
+    ingest(BackfillSource(FIXTURES), store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    del manifest["selection"]
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    source = BackfillSource(FIXTURES)
+    ingest(source, store, today=date(2024, 11, 26))
+
+    assert selection(tmp_path) == {"datasets": ["core"], "seasons": "all"}
+    assert source.seasons_requested == ["2024-25"]

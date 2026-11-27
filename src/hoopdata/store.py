@@ -19,6 +19,10 @@ SCHEMA_VERSION = 1
 SUCCEEDED = "succeeded"
 FAILED = "failed"
 
+# The dataset every data root holds, and the season set that means every season, including future ones.
+CORE = "core"
+ALL_SEASONS = "all"
+
 
 class Store:
     def __init__(self, data_root):
@@ -44,6 +48,23 @@ class Store:
         if not self.manifest_path.exists():
             return {"schema_version": SCHEMA_VERSION, "last_updated": None, "items": []}
         return json.loads(self.manifest_path.read_text(encoding="utf-8"))
+
+    def read_selection(self):
+        """The saved selection as ``{"datasets": [...], "seasons": "all" or [...]}``, or ``None`` for an empty data root.
+
+        A v1 manifest with items but no selection holds core with all seasons.
+        """
+        manifest = self.read_manifest()
+        if "selection" in manifest:
+            return manifest["selection"]
+        if manifest["items"]:
+            return {"datasets": [CORE], "seasons": ALL_SEASONS}
+        return None
+
+    def write_selection(self, selection):
+        manifest = self.read_manifest()
+        manifest["selection"] = selection
+        _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
 
     def succeeded_items(self, season):
         """The ``(table, season_type)`` items of ``season`` whose latest fetch succeeded."""
