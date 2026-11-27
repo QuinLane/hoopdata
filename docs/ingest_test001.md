@@ -82,3 +82,7 @@ All three 2026-27 playoff items gave 0 rows, not a failure. 129 new players got 
 2026-27 is also missing one (540 team rows, 269 `games` rows). `transform.games` pairs one team's ` vs. ` matchup with the other's ` @ `. A neutral-site game doesn't have that pair, so it is silently dropped. The views don't read `games`, so standings and averages are unaffected. The fixtures cover no neutral-site games, so the tests didn't catch it.
 
 The real response shows both matchups read `@` (`MIA @ WAS` and `WAS @ MIA`), so the team game log can't say which team is home. Fixed test-first: these games are now kept with a new `neutral_site` column, and the lower team ID is listed as home. On the real 2024-25 response that gives 1,230 games, 5 of them flagged.
+
+### Step 3: first backfill crashed on a blank bio field (fixed)
+
+The box scores for all 31 seasons were fetched in about 2 minutes. Then the bio step crashed on the first batch: Luc Longley's recorded bio has `WEIGHT` set to one space (`" "`), which `transform.players` didn't treat as empty, so turning it into a number failed. Many older players also have a blank `HEIGHT` and `WEIGHT` (`""`), which was already handled. Because the failure happens while turning the batch into a table, not while fetching a bio, it isn't caught per bio and stops the whole run before it publishes. Fixed test-first by treating `" "` as empty too. 2,220 players still needed bios at that point, about 37 minutes.

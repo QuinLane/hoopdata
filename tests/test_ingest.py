@@ -312,6 +312,28 @@ def test_undrafted_players_have_empty_draft_fields_and_drafted_ones_keep_integer
     assert draft_number_type == "BIGINT"
 
 
+class BlankSizeSource(ReplaySource):
+    """Replay source whose player infos have no height and a weight of one space, as some old players' do."""
+
+    def player_info(self, player_id):
+        raw = super().player_info(player_id)
+        result = raw["resultSets"][0]
+        row = result["rowSet"][0]
+        row[result["headers"].index("HEIGHT")] = ""
+        row[result["headers"].index("WEIGHT")] = " "
+        return raw
+
+
+def test_blank_heights_and_weights_are_stored_as_empty(tmp_path):
+    # Luc Longley's recorded bio has HEIGHT "" and WEIGHT " ".
+    ingest(BlankSizeSource(FIXTURES), Store(tmp_path), seasons=["2023-24"])
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        row = con.execute("select height_in, weight_lb from players where player_id = ?", [JOKIC]).fetchone()
+
+    assert row == (None, None)
+
+
 def test_player_bios_are_fetched_only_for_players_not_yet_stored(tmp_path):
     store = Store(tmp_path)
     ingest(CountingSource(FIXTURES, hidden_player_ids=[JOKIC]), store, seasons=["2023-24"])
