@@ -50,6 +50,7 @@ class NbaApiSource:
             lambda: endpoint(
                 season_nullable=season,
                 season_type_nullable=season_type,
+                # nba_api's real keyword for both endpoints, TeamGameLogs included.
                 measure_type_player_game_logs_nullable="Advanced",
                 timeout=self.timeout,
             )
