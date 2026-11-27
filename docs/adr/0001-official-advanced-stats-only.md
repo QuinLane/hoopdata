@@ -1,0 +1,3 @@
+# Official advanced stats are the only ratings
+
+Possessions, pace, offensive, defensive and net rating, usage and the other advanced rates come only from NBA's official advanced box scores, stored as given. hoopdata never recomputes them from play-by-play, even though the play-by-play dataset would make that possible. Two versions of the same stat would disagree slightly and leave consumers to pick one. NBA's numbers are the official ones, and that follows the v1 rule that nothing is estimated twice. Play-by-play views cover only what advanced box scores can't give, such as lineups, on/off splits and who assisted whom. Play-by-play is still summed and checked against the **basic** box scores (reconciliation), which is a correctness check, not a second source of stats.
