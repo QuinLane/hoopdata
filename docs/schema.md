@@ -212,17 +212,18 @@ One row per season, team and player on the team's official roster, as NBA last r
 | `season` | VARCHAR | Season, like `2023-24` |
 | `team_id` | BIGINT | NBA team ID |
 | `player_id` | BIGINT | NBA player ID |
-| `player_name` | VARCHAR | Player's name as listed on the roster |
+| `player_name` | VARCHAR | Player's name as listed on the official roster |
 | `jersey_number` | VARCHAR | Jersey number as given, so `0` and `00` stay different |
 | `position` | VARCHAR | Position as given, like `G` or `F-C` |
 | `experience` | VARCHAR | Seasons of NBA experience as given, `R` for a rookie |
 | `how_acquired` | VARCHAR | How the team got the player as given, like `#21 Pick in 2022 Draft`; often `NULL`, always in early seasons |
 
-**What the snapshot leaves out.** The roster is one snapshot, stored as given and not repaired:
+**What the snapshot leaves out.** The official roster is one snapshot, stored as given and not repaired:
 - Players gone before NBA's last report are missing. SEA 1996-97 lists 12 players where core has 16 who appeared: Craig Ehlo (62 games) isn't there. OKC 2024-25 misses Alex Reese and Malevy Leons.
-- A new season's rosters arrive only after its first game, since the teams come from core.
+- A new season's official rosters arrive only after its first game, since the teams come from core.
+- Players who never appeared in a game have no bio, since bios come from `players`, which only covers players in a box score. Nikola Topić (OKC 2024-25) is on the official roster, but `official_roster_details` has `NULL` bio columns for him.
 
-Not stored from the source: `LeagueID`, the source `SEASON` (the start year), `NICKNAME`, `PLAYER_SLUG`, `SUPPLEMENTAL_STATUS` and the bio columns `HEIGHT`, `WEIGHT`, `BIRTH_DATE`, `AGE` and `SCHOOL` (bios live in `players`), and the coaching staff in the second result set (stored in `coach_seasons`).
+Not stored from the source: `LeagueID`, the source `SEASON` (the start year), `NICKNAME`, `PLAYER_SLUG`, `SUPPLEMENTAL_STATUS` and the bio columns `HEIGHT`, `WEIGHT`, `BIRTH_DATE`, `AGE` and `SCHOOL` (bios live in `players`), and the second result set, the team's staff (its coaches are stored in `coach_seasons`).
 
 ### `coach_seasons` (rosters dataset)
 
@@ -240,7 +241,7 @@ Only head and assistant coaches are kept: rows whose `COACH_TYPE` contains `Head
 | `coach_name` | VARCHAR | Coach's full name |
 | `coach_type` | VARCHAR | Role as given, like `Head Coach` or `Lead Assistant Coach` |
 
-**What the snapshot leaves out.** The staff is one snapshot, stored as given and not repaired:
+**What the snapshot leaves out.** The coaches are one snapshot, stored as given and not repaired:
 - Coaches gone before NBA's last report are missing. MEM 2024-25 lists only Tuomas Iisalo: Taylor Jenkins, fired in March 2025, isn't there.
 - The report can come after the season. NYK 2024-25 lists no head coach, since Tom Thibodeau was removed after his June 2025 firing.
 - Early seasons list only the head coach, like SEA 1996-97.
@@ -377,8 +378,8 @@ One row per coach in `coach_seasons`. Only published when `rosters` is in the se
 |---|---|---|
 | `coach_id` | BIGINT | Grain |
 | `first_name`, `last_name`, `coach_name` | VARCHAR | As in the coach's latest season |
-| `first_season` | VARCHAR | Coach's first season on a staff |
-| `last_season` | VARCHAR | Coach's latest season on a staff |
+| `first_season` | VARCHAR | Coach's first season with any team |
+| `last_season` | VARCHAR | Coach's latest season with any team |
 
 ### `coach_teams` (rosters dataset)
 
@@ -391,7 +392,7 @@ One row per coach and team. Only published when `rosters` is in the selection.
 | `team_abbreviation` | VARCHAR | Team abbreviation, as in `team_coaches`, in the coach's latest season with that team |
 | `first_season` | VARCHAR | Coach's first season with that team |
 | `last_season` | VARCHAR | Coach's latest season with that team |
-| `seasons` | BIGINT | Seasons on that team's staff |
+| `seasons` | BIGINT | Seasons coaching that team |
 | `head_coach_seasons` | BIGINT | Of those, seasons as `Head Coach` (an associate head coach doesn't count) |
 
 ### `team_coaches` (rosters dataset)
