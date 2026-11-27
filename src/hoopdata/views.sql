@@ -122,7 +122,7 @@ group by season, season_type, team_id;
 
 create view games as
 select
-    game_id, season, season_type, game_date,
+    game_id, season, season_type, game_date, neutral_site,
     home_team_id, away_team_id, home_pts, away_pts
 from read_parquet(
     '{root}/games/*/*.parquet',
