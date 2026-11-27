@@ -130,10 +130,81 @@ def test_the_estimate_counts_one_request_per_core_game_not_held_yet(tmp_path, ca
     assert "About 7 requests, roughly 7 s (core: 6 · pbp: 1)" in retry
 
 
-def test_without_pbp_selected_play_by_play_doesnt_exist(tmp_path):
+def test_without_pbp_selected_play_by_play_and_its_views_dont_exist(tmp_path):
     ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2023-24"], datasets=["shots"], today=SUMMER)
 
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         views = {row[0] for row in con.execute("select view_name from duckdb_views() where not internal").fetchall()}
     assert "shots" in views
-    assert "play_by_play" not in views
+    assert {"play_by_play", "pbp_reconciliation", "pbp_reconciliation_seasons"}.isdisjoint(views)
+
+
+STATS = ["pts", "fgm", "fga", "fg3m", "fg3a", "ftm", "fta", "reb", "ast", "stl", "blk", "tov", "pf"]
+
+
+@pytest.fixture
+def both_seasons(tmp_path):
+    """Ingest 2022-23 and 2023-24 with pbp and open the published file read-only."""
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2022-23", "2023-24"], datasets=["pbp"], today=SUMMER)
+    con = duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True)
+    yield con
+    con.close()
+
+
+def test_every_fixture_game_reconciles_with_its_box_scores_on_every_stat(both_seasons):
+    rows = both_seasons.execute("select game_id, team_id, matches from pbp_reconciliation order by all").fetchall()
+    opener_denver = both_seasons.execute(
+        f"select {', '.join(f'pbp_{stat}, box_{stat}' for stat in STATS)} from pbp_reconciliation "
+        "where game_id = ? and team_id = ?",
+        [OPENER, NUGGETS],
+    ).fetchone()
+
+    # Nine games, two teams each. The fixtures hold technicals, a defensive three seconds, flopping, a flagrant, team
+    # rebounds and team turnovers, so the counting rules are all exercised.
+    assert len(rows) == 18
+    assert all(matches for _, _, matches in rows)
+    # Denver's opener box score: 125 PTS, 49-93 FG, 13-30 3PT, 14-19 FT, 51 REB, 33 AST, 11 STL, 6 BLK, 20 TOV, 17 PF.
+    assert opener_denver == (
+        125, 125, 49, 49, 93, 93, 13, 13, 30, 30, 14, 14, 19, 19, 51, 51, 33, 33, 11, 11, 6, 6, 20, 20, 17, 17,
+    )
+
+
+class DroppedShotSource(ReplaySource):
+    """Replay source whose opener play-by-play is missing Jokic's opening layup (action 9, a made 2)."""
+
+    def play_by_play(self, game_id):
+        response = super().play_by_play(game_id)
+        if game_id == OPENER:
+            actions = response["game"]["actions"]
+            response["game"]["actions"] = [action for action in actions if action["actionId"] != 9]
+        return response
+
+
+def test_a_dropped_made_shot_shows_as_a_mismatch_in_pts_fgm_and_fga_without_failing_any_item(tmp_path):
+    report = ingest(DroppedShotSource(FIXTURES), Store(tmp_path), seasons=["2023-24"], datasets=["pbp"], today=SUMMER)
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        mismatches = con.execute("select game_id, team_id from pbp_reconciliation where not matches").fetchall()
+        denver = con.execute(
+            f"select {', '.join(f'pbp_{stat} - box_{stat}' for stat in STATS)} from pbp_reconciliation "
+            "where game_id = ? and team_id = ?",
+            [OPENER, NUGGETS],
+        ).fetchone()
+
+    assert report.failed == []
+    assert mismatches == [(OPENER, NUGGETS)]
+    # Only PTS, FGM and FGA are off, by the layup's 2 points and one shot.
+    assert dict(zip(STATS, denver)) == {stat: 0 for stat in STATS} | {"pts": -2, "fgm": -1, "fga": -1}
+
+
+def test_the_season_rollup_counts_games_and_games_where_both_teams_match(tmp_path):
+    ingest(DroppedShotSource(FIXTURES), Store(tmp_path), seasons=["2022-23", "2023-24"], datasets=["pbp"], today=SUMMER)
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        rows = con.execute("select * from pbp_reconciliation_seasons order by season").fetchall()
+
+    # The opener's Dallas side still matches, but the game doesn't.
+    assert rows == [
+        ("2022-23", "Regular Season", 1, 1, 1.0),
+        ("2023-24", "Regular Season", 8, 7, 0.875),
+    ]

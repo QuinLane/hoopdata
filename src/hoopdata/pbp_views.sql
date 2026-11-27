@@ -11,3 +11,70 @@ from read_parquet(
     hive_partitioning = true,
     hive_types = {'season': varchar}
 );
+
+-- One row per game and team: each stat summed from play-by-play next to the team box score. The counting rules are in
+-- docs/schema.md.
+create view pbp_reconciliation as
+with pbp_sums as (
+    select
+        game_id,
+        team_id,
+        sum(case when action_type = 'Made Shot' then shot_value else 0 end)::bigint
+            + count(*) filter (where action_type = 'Free Throw' and description not like 'MISS%') as pts,
+        count(*) filter (where action_type = 'Made Shot') as fgm,
+        count(*) filter (where action_type in ('Made Shot', 'Missed Shot')) as fga,
+        count(*) filter (where action_type = 'Made Shot' and shot_value = 3) as fg3m,
+        count(*) filter (where action_type in ('Made Shot', 'Missed Shot') and shot_value = 3) as fg3a,
+        count(*) filter (where action_type = 'Free Throw' and description not like 'MISS%') as ftm,
+        count(*) filter (where action_type = 'Free Throw') as fta,
+        -- Player rebounds only: team rebounds have no person_id.
+        count(*) filter (where action_type = 'Rebound' and person_id is not null) as reb,
+        count(*) filter (where action_type = 'Made Shot' and description like '%AST)%') as ast,
+        count(*) filter (where description like '%STEAL%') as stl,
+        count(*) filter (where description like '%BLOCK%') as blk,
+        count(*) filter (where action_type = 'Turnover') as tov,
+        -- Technicals aren't personal fouls.
+        count(*) filter (
+            where action_type = 'Foul'
+            and sub_type not in ('Technical', 'Double Technical', 'Defense 3 Second', 'Flopping')
+        ) as pf
+    from play_by_play
+    group by game_id, team_id
+)
+select
+    box.season, box.season_type, box.game_id, box.team_id,
+    coalesce(pbp.pts, 0) as pbp_pts, box.pts as box_pts,
+    coalesce(pbp.fgm, 0) as pbp_fgm, box.fgm as box_fgm,
+    coalesce(pbp.fga, 0) as pbp_fga, box.fga as box_fga,
+    coalesce(pbp.fg3m, 0) as pbp_fg3m, box.fg3m as box_fg3m,
+    coalesce(pbp.fg3a, 0) as pbp_fg3a, box.fg3a as box_fg3a,
+    coalesce(pbp.ftm, 0) as pbp_ftm, box.ftm as box_ftm,
+    coalesce(pbp.fta, 0) as pbp_fta, box.fta as box_fta,
+    coalesce(pbp.reb, 0) as pbp_reb, box.reb as box_reb,
+    coalesce(pbp.ast, 0) as pbp_ast, box.ast as box_ast,
+    coalesce(pbp.stl, 0) as pbp_stl, box.stl as box_stl,
+    coalesce(pbp.blk, 0) as pbp_blk, box.blk as box_blk,
+    coalesce(pbp.tov, 0) as pbp_tov, box.tov as box_tov,
+    coalesce(pbp.pf, 0) as pbp_pf, box.pf as box_pf,
+    (pbp_pts, pbp_fgm, pbp_fga, pbp_fg3m, pbp_fg3a, pbp_ftm, pbp_fta, pbp_reb, pbp_ast, pbp_stl, pbp_blk, pbp_tov, pbp_pf)
+        = (box_pts, box_fgm, box_fga, box_fg3m, box_fg3a, box_ftm, box_fta, box_reb, box_ast, box_stl, box_blk, box_tov, box_pf)
+        as matches
+from team_box_scores as box
+left join pbp_sums as pbp using (game_id, team_id)
+where box.game_id in (select game_id from play_by_play);
+
+-- One row per season and season type: how many held games reconcile, both teams matching.
+create view pbp_reconciliation_seasons as
+with game_matches as (
+    select season, season_type, game_id, bool_and(matches) as matches
+    from pbp_reconciliation
+    group by all
+)
+select
+    season,
+    season_type,
+    count(*) as games,
+    count(*) filter (where matches) as matching_games,
+    matching_games / games as matching_share
+from game_matches
+group by all;
