@@ -164,7 +164,9 @@ DATASETS = {
         {GAME: [(PLAY_BY_PLAY, None)]},
         lambda source, store, season, season_type, kind: _fetch_play_by_play(source, store, season, season_type),
         files("hoopdata").joinpath("pbp_views.sql").read_text(encoding="utf-8"),
-        requests=lambda store, season, season_type: len(_games_without_play_by_play(store, season, season_type)),
+        requests=lambda store, season, season_type: len(_games_without_play_by_play(
+            store, season, season_type, store.read_partition(TEAM_BOX_SCORES, season, season_type)
+        )),
     ),
 }
 
@@ -208,8 +210,8 @@ def _fetch_play_by_play(source, store, season, season_type):
     game is logged and the rest are still fetched, then the item fails. If core holds no games for
     them, the item fails without any requests.
     """
-    _core_team_box_scores(store, season, season_type)
-    game_ids = _games_without_play_by_play(store, season, season_type)
+    team_box_scores = _core_team_box_scores(store, season, season_type)
+    game_ids = _games_without_play_by_play(store, season, season_type, team_box_scores)
     rows, errors = 0, []
     for game_id in game_ids:
         try:
@@ -224,9 +226,9 @@ def _fetch_play_by_play(source, store, season, season_type):
     return rows
 
 
-def _games_without_play_by_play(store, season, season_type):
-    """The games in core's team box scores of ``season`` and ``season_type`` with no play-by-play held yet, sorted."""
-    team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
+def _games_without_play_by_play(store, season, season_type, team_box_scores):
+    """The games in ``team_box_scores``, core's for ``season`` and ``season_type`` or ``None``, with no play-by-play
+    held yet, sorted."""
     games = set(team_box_scores["game_id"]) if team_box_scores is not None else set()
     return sorted(games - store.held_games(PLAY_BY_PLAY, season, season_type, dataset=PBP))
 
