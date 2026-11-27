@@ -137,6 +137,39 @@ Keys only for identity: names, dates, results and team abbreviations come from c
 
 Not stored from the source: the `E_*` estimated versions (a second estimate of the same stat, ADR 0001), the `sp_work_*` internal copies, every `*_RANK` column (ranks only mean something inside one response), the copies of core data (`FGM`, `FGA`, `FG_PCT`, `MIN`, names, date, matchup, `WL`) and `AVAILABLE_FLAG`, `MIN_SEC` and `TEAM_COUNT`.
 
+### `shots` (shots dataset)
+
+One row per field-goal attempt (a shot), with where and how it was taken, exactly as NBA gives it. Free throws aren't shots. Only in a data root whose selection includes `shots`. Source: stats.nba.com `shotchartdetail` with `player_id=0` and the FGA measure, one request per team in core's `team_box_scores` for that season and season type (a league-wide request is too large for a regular season). Stored as Parquet under `shots/shots/season=<season>/`, one file per season type. An item fails as a whole if any of its team requests fails.
+
+Keys only for identity: names, dates, results and team abbreviations come from core (see `shot_details`). A game's shots add up to core's box scores: per team, the count equals `fga` and the sum of `shot_made_flag` equals `fgm`. This was checked against the live API (1996-97, 2001-02 and 2024-25); there's no runtime check.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `season_type` | VARCHAR | `Regular Season` |
+| `game_id` | VARCHAR | NBA game ID, leading zeros kept |
+| `game_event_id` | BIGINT | The shot's event number within the game |
+| `player_id` | BIGINT | NBA player ID of the shooter |
+| `team_id` | BIGINT | NBA team ID of the shooter's team |
+| `period` | BIGINT | Period: 1-4, then 5 on for overtimes |
+| `minutes_remaining` | BIGINT | Minutes left on the period clock |
+| `seconds_remaining` | BIGINT | Seconds left on the period clock, past `minutes_remaining` |
+| `action_type` | VARCHAR | How the shot was taken, like `Driving Layup Shot` |
+| `shot_type` | VARCHAR | `2PT Field Goal` or `3PT Field Goal` |
+| `shot_zone_basic` | VARCHAR | Court zone, like `Restricted Area` or `Above the Break 3` |
+| `shot_zone_area` | VARCHAR | Side of the court, like `Left Side Center(LC)` |
+| `shot_zone_range` | VARCHAR | Distance band, like `Less Than 8 ft.` or `24+ ft.` |
+| `shot_distance` | BIGINT | Distance from the basket in feet |
+| `loc_x` | BIGINT | Court x, side to side, in tenths of a foot from the basket |
+| `loc_y` | BIGINT | Court y, toward half court, in tenths of a foot from the basket |
+| `shot_made_flag` | BIGINT | `1` made, `0` missed, so `sum()` gives FGM |
+
+**Missing locations look like shots at the rim.** A shot with no recorded location comes back at (0,0), `Restricted Area`, 0 ft, the same as a real shot at the rim. They are stored as given: no cutoff, `NULL` or flag. Shots at (0,0), measured live: 32% in 1996-97, 23% in 2001-02 and 2% in 2024-25 (mostly real tip-ins). Play-by-play has the same gaps, so treat early-season locations as incomplete.
+
+**Matching play-by-play.** `game_event_id` and `player_id` match play-by-play v3's `actionNumber` and `personId` (`actionNumber` alone isn't unique there). Every shot matched in the samples checked (`0029600001` and a 2024-25 game).
+
+Not stored from the source: `GRID_TYPE`, the copies of core data (`PLAYER_NAME`, `TEAM_NAME`, `GAME_DATE`, `HTM`, `VTM`), `EVENT_TYPE` (the same as `shot_made_flag`) and `SHOT_ATTEMPTED_FLAG` (always 1), and the league-average zones in the second result set.
+
 ## Views
 
 ### `player_game_stats`
@@ -226,6 +259,17 @@ Per-game player advanced stats with core's names, dates and results: every `play
 | `team_abbreviation` | VARCHAR | Team abbreviation at the time of the game |
 | `game_date` | DATE | Date the game was played |
 | `wl` | VARCHAR | `W` or `L` for the player's team |
+
+### `shot_details` (shots dataset)
+
+Every shot with core's names, dates and results: every `shots` column, plus these from the matching `player_box_scores` row (joined on `game_id` and `player_id`). Only published when `shots` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `player_name` | VARCHAR | Shooter's name as listed in that game |
+| `team_abbreviation` | VARCHAR | Team abbreviation at the time of the game |
+| `game_date` | DATE | Date the game was played |
+| `wl` | VARCHAR | `W` or `L` for the shooter's team |
 
 ### `hoopdata_info`
 

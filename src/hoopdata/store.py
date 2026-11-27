@@ -118,6 +118,15 @@ class Store:
         path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
         _write_parquet(df.drop(columns="season"), path)
 
+    def read_partition(self, table, season, season_type, dataset=CORE):
+        """Read one table/season/season_type partition of ``dataset``, or ``None`` if it hasn't been written yet."""
+        folder = self.dataset_root(dataset) / table / f"season={season}"
+        path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
+        if not path.exists():
+            return None
+        with duckdb.connect() as con:
+            return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
+
     def write_table(self, table, df):
         """Atomically write a whole unpartitioned table as one Parquet file."""
         _write_parquet(df, self.root / f"{table}.parquet")
