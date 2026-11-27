@@ -108,7 +108,7 @@ One row per current NBA team. Current identity only; historical names live on th
 
 One row per player per game, holding NBA's official advanced stats exactly as given. Only in a data root whose selection includes `advanced`. Source: the stats.nba.com player game logs with the Advanced measure type, one league-wide request per season and season type. Stored as Parquet under `advanced/player_advanced_box_scores/season=<season>/`, one file per season type.
 
-Keys only for identity: names, dates, results and team abbreviations come from core (see `player_advanced_game_stats`). The `(game_id, player_id)` keys match `player_box_scores` exactly: every advanced row has a core row and every core row has an advanced row. This was checked against the live API (1996-97 Regular Season, 2024-25 Playoffs); there's no runtime check.
+Keys only for identity: names, dates, results and team abbreviations come from core (see `player_advanced_game_stats`). The `(game_id, player_id)` keys match `player_box_scores` exactly: every advanced row has a core row and every core row has an advanced row. This was checked against the live API (1996-97 Regular Season, 2024-25 Playoffs), which also found no NULLs in `off_rating`, `poss`, `pie` or `pace`; there's no runtime check.
 
 | Column | Type | Meaning | Scale |
 |---|---|---|---|
@@ -135,13 +135,13 @@ Keys only for identity: names, dates, results and team abbreviations come from c
 | `poss` | BIGINT | Possessions played | Count (`72`) |
 | `pie` | DOUBLE | Player Impact Estimate: share of the game's events the player contributed | Fraction (`0.234`) |
 
-Not stored from the source: the `E_*` estimated versions (a second estimate of the same stat, ADR 0001), the `sp_work_*` internal copies, every `*_RANK` column (ranks only mean something inside one response), the copies of core data (`FGM`, `FGA`, `FG_PCT`, `MIN`, names, date, matchup, `WL`) and `AVAILABLE_FLAG`, `MIN_SEC` and `TEAM_COUNT`.
+Not stored from the source: the `E_*` estimated versions (a second estimate of the same stat, ADR 0001), the `sp_work_*` internal copies, every `*_RANK` column (ranks only mean something inside one response), the copies of core data (`FGM`, `FGA`, `FGM_PG`, `FGA_PG`, `FG_PCT`, `MIN`, names, date, matchup, `WL`) and `AVAILABLE_FLAG`, `MIN_SEC` and `TEAM_COUNT`.
 
 ### `team_advanced_box_scores` (advanced dataset)
 
 One row per team per game, holding NBA's official advanced stats exactly as given. Only in a data root whose selection includes `advanced`. Source: the stats.nba.com team game logs with the Advanced measure type, one league-wide request per season and season type. Stored as Parquet under `advanced/team_advanced_box_scores/season=<season>/`, one file per season type.
 
-Keys only for identity: team abbreviations, dates and results come from core (see `team_advanced_game_stats`). The `(game_id, team_id)` keys match `team_box_scores` exactly: every advanced row has a core row and every core row has an advanced row. This was checked against the live API (1996-97 Regular Season, 2024-25 Playoffs); there's no runtime check.
+Keys only for identity: team abbreviations, dates and results come from core (see `team_advanced_game_stats`). The `(game_id, team_id)` keys match `team_box_scores` exactly: every advanced row has a core row and every core row has an advanced row. This was checked against the live API (1996-97 Regular Season, 2024-25 Playoffs), which also found no NULLs in `off_rating`, `poss`, `pie` or `pace`; there's no runtime check.
 
 The columns are the player table's without `player_id` and `usg_pct` (NBA gives no usage for teams). Note `tm_tov_pct` is a fraction here but a percent in `player_advanced_box_scores`; both are as NBA gives them.
 
