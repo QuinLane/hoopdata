@@ -55,7 +55,8 @@ select
 from coach_seasons
 group by coach_id;
 
--- Only the head coach counts toward head_coach_seasons, not an associate head coach.
+-- Only the head coach counts toward head_coach_seasons, not an associate head coach. A coach can be listed twice in
+-- a season under two titles, so seasons are counted once each.
 create view coach_teams as
 select
     coach_id,
@@ -64,7 +65,7 @@ select
     arg_max(team_abbreviation, season) as team_abbreviation,
     min(season) as first_season,
     max(season) as last_season,
-    count(*) as seasons,
-    count(*) filter (where coach_type = 'Head Coach') as head_coach_seasons
+    count(distinct season) as seasons,
+    count(distinct season) filter (where coach_type = 'Head Coach') as head_coach_seasons
 from team_coaches
 group by coach_id, team_id;
