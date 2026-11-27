@@ -6,6 +6,7 @@ import pytest
 
 from hoopdata.ingest import ingest
 from hoopdata.source import ReplaySource
+from hoopdata.transform import is_team_id
 from hoopdata.store import Store
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -142,17 +143,16 @@ def test_playoff_and_play_in_games_are_stored_under_their_own_season_type_with_t
         regular_season = describe(folder / "regular_season" / f"{OPENER}.parquet")
         playoffs = describe(folder / "playoffs" / "0042300151.parquet")
         play_in = describe(folder / "playin" / "0052300121.parquet")
-        team_ids_as_person_ids = con.execute(
-            f"select count(*) from read_parquet('{folder.as_posix()}/playoffs/0042300151.parquet') "
-            f"where person_id // 1000 = 1610612"
-        ).fetchone()[0]
+        person_ids = con.execute(
+            f"select person_id from read_parquet('{folder.as_posix()}/playoffs/0042300151.parquet')"
+        ).df()["person_id"]
 
     assert report.failed == []
     assert playoffs == regular_season
     assert play_in == regular_season
     assert (tmp_path / "pbp" / "play_by_play" / "season=2022-23" / "playoffs" / "0042200311.parquet").exists()
     assert (tmp_path / "pbp" / "play_by_play" / "season=2022-23" / "playin" / "0052200121.parquet").exists()
-    assert team_ids_as_person_ids == 0
+    assert not is_team_id(person_ids).any()
 
 
 class MissingCorePlayoffsSource(PlayByPlaySource):

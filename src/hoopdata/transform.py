@@ -105,6 +105,12 @@ PLAY_BY_PLAY_TYPES = {
 # Team IDs all start with these digits, like 1610612743. No player ID does.
 TEAM_ID_PREFIX = 1610612
 
+
+def is_team_id(ids):
+    """Whether each of ``ids`` is a team ID rather than a player ID."""
+    return ids // 10**3 == TEAM_ID_PREFIX
+
+
 PLAYER_COLUMNS = [
     "player_id", "first_name", "last_name", "display_name", "birthdate",
     "height_in", "weight_lb", "position", "country", "school",
@@ -199,7 +205,7 @@ def play_by_play(raw):
     df = pd.DataFrame(raw["game"]["actions"])
     df.columns = df.columns.str.replace(r"([A-Z])", r"_\1", regex=True).str.lower()
     df["game_id"] = raw["game"]["gameId"]
-    team_level = df["person_id"] // 10**3 == TEAM_ID_PREFIX
+    team_level = is_team_id(df["person_id"])
     df.loc[team_level, "team_id"] = df.loc[team_level, "person_id"]
     df.loc[team_level, "person_id"] = None
     df[["score_home", "score_away"]] = df[["score_home", "score_away"]].replace("", None)
