@@ -18,6 +18,7 @@ GAMES = "games"
 PLAYERS = "players"
 TEAMS = "teams"
 PLAYER_ADVANCED_BOX_SCORES = "player_advanced_box_scores"
+TEAM_ADVANCED_BOX_SCORES = "team_advanced_box_scores"
 
 ADVANCED = "advanced"
 
@@ -38,8 +39,8 @@ NEW_PLAYERS_PER_SEASON = 90
 # Rough requests for each dataset's full backfill of every season, shown in --help.
 # Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player
 # bios (NEW_PLAYERS_PER_SEASON for each season).
-# Advanced: one league-wide player game log per season and season type, ~63 requests.
-FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 63}
+# Advanced: one league-wide player and one team game log per season and season type, ~125 requests.
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 125}
 
 log = logging.getLogger(__name__)
 
@@ -108,8 +109,15 @@ DATASETS = {
     ),
     ADVANCED: Dataset(
         ADVANCED,
-        {PLAYER: [(PLAYER_ADVANCED_BOX_SCORES, transform.player_advanced_box_scores)]},
-        lambda source, season, season_type, kind: source.player_advanced_game_log(season, season_type),
+        {
+            PLAYER: [(PLAYER_ADVANCED_BOX_SCORES, transform.player_advanced_box_scores)],
+            TEAM: [(TEAM_ADVANCED_BOX_SCORES, transform.team_advanced_box_scores)],
+        },
+        lambda source, season, season_type, kind: (
+            source.player_advanced_game_log(season, season_type)
+            if kind == PLAYER
+            else source.team_advanced_game_log(season, season_type)
+        ),
         files("hoopdata").joinpath("advanced_views.sql").read_text(encoding="utf-8"),
     ),
 }

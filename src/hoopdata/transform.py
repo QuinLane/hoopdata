@@ -34,6 +34,11 @@ ADVANCED_STAT_COLUMNS = [
 
 PLAYER_ADVANCED_BOX_SCORE_COLUMNS = ["season", "season_type", "game_id", "player_id", "team_id", *ADVANCED_STAT_COLUMNS]
 
+# NBA gives no usg_pct for teams.
+TEAM_ADVANCED_BOX_SCORE_COLUMNS = [
+    "season", "season_type", "game_id", "team_id", *[column for column in ADVANCED_STAT_COLUMNS if column != "usg_pct"],
+]
+
 ADVANCED_BOX_SCORE_TYPES = {
     **dict.fromkeys(["season", "season_type", "game_id"], "string"),
     **dict.fromkeys(["player_id", "team_id", "poss"], "Int64"),
@@ -81,10 +86,17 @@ def games(raw, season, season_type):
 
 def player_advanced_box_scores(raw, season, season_type):
     """The keys and official rates of an advanced player game log, values as given."""
-    df = _result_set(raw)
+    return _advanced_box_scores(_result_set(raw), season, season_type, PLAYER_ADVANCED_BOX_SCORE_COLUMNS)
+
+
+def team_advanced_box_scores(raw, season, season_type):
+    """The keys and official rates of an advanced team game log, values as given."""
+    return _advanced_box_scores(_result_set(raw), season, season_type, TEAM_ADVANCED_BOX_SCORE_COLUMNS)
+
+
+def _advanced_box_scores(df, season, season_type, columns):
     df["season"] = season
     df["season_type"] = season_type
-    columns = PLAYER_ADVANCED_BOX_SCORE_COLUMNS
     return df[columns].astype({column: ADVANCED_BOX_SCORE_TYPES[column] for column in columns})
 
 
