@@ -63,6 +63,75 @@ def test_official_roster_details_adds_cores_team_and_the_bio_only_for_players_wh
     ]
 
 
+MALONE = 2610
+
+
+def test_coach_seasons_hold_only_coaches_as_given_with_only_the_kept_columns(db):
+    columns = db.execute("select column_name, column_type from (describe coach_seasons)").fetchall()
+    rows = db.execute(
+        "select * from coach_seasons where season = '2023-24' and team_id = ? order by coach_id", [NUGGETS]
+    ).fetchall()
+    coach_types = db.execute("select distinct coach_type from coach_seasons order by 1").fetchall()
+
+    assert columns == [
+        ("season", "VARCHAR"), ("team_id", "BIGINT"), ("coach_id", "BIGINT"), ("first_name", "VARCHAR"),
+        ("last_name", "VARCHAR"), ("coach_name", "VARCHAR"), ("coach_type", "VARCHAR"),
+    ]
+    # Dan Shimensky, the trainer, is left out.
+    assert rows == [
+        ("2023-24", NUGGETS, MALONE, "Michael", "Malone", "Michael Malone", "Head Coach"),
+        ("2023-24", NUGGETS, 202434, "Popeye", "Jones", "Popeye Jones", "Assistant Coach"),
+        ("2023-24", NUGGETS, 202443, "Ryan", "Saunders", "Ryan Saunders", "Assistant Coach"),
+        ("2023-24", NUGGETS, 202894, "Charles", "Klask", "Charles Klask", "Assistant Coach"),
+        ("2023-24", NUGGETS, 203391, "Ryan", "Bowen", "Ryan Bowen", "Assistant Coach"),
+        ("2023-24", NUGGETS, 203600, "David", "Adelman", "David Adelman", "Assistant Coach"),
+        ("2023-24", NUGGETS, 1630491, "John", "Beckett", "John Beckett", "Assistant Coach"),
+        ("2023-24", NUGGETS, 1630932, "Ognjen", "Stojakovic", "Ognjen Stojakovic", "Assistant Coach"),
+        ("2023-24", NUGGETS, 1641545, "Elvis", "Valcarcel", "Elvis Valcarcel", "Assistant Coach"),
+    ]
+    # Trainers and assistant trainers are dropped.
+    assert coach_types == [
+        ("Assistant Coach",), ("Assistant Coach for Player Development",), ("Associate Head Coach",),
+        ("Head Coach",), ("Lead Assistant Coach",),
+    ]
+
+
+POPEYE_JONES = 202434
+HAM = 203005  # Lakers head coach in 2022-23; their 2023-24 report, made after he was fired, lists no head coach
+BORREGO = 202435  # Pelicans associate head coach in 2023-24
+PELICANS = 1610612740
+
+
+def test_coach_views_follow_each_coach_across_teams_and_seasons(db):
+    coaches = db.execute(
+        "select * from coaches where coach_id in (?, ?, ?) order by coach_id", [MALONE, POPEYE_JONES, HAM]
+    ).fetchall()
+    coach_teams = db.execute(
+        "select * from coach_teams where coach_id in (?, ?, ?, ?) order by coach_id",
+        [MALONE, POPEYE_JONES, BORREGO, HAM],
+    ).fetchall()
+    team_coaches = db.execute(
+        "select * from team_coaches where coach_id = ? order by season", [MALONE]
+    ).fetchall()
+
+    assert coaches == [
+        (MALONE, "Michael", "Malone", "Michael Malone", "2022-23", "2023-24"),
+        (POPEYE_JONES, "Popeye", "Jones", "Popeye Jones", "2022-23", "2023-24"),
+        (HAM, "Darvin", "Ham", "Darvin Ham", "2022-23", "2022-23"),
+    ]
+    # An associate head coach isn't the head coach.
+    assert coach_teams == [
+        (MALONE, "Michael Malone", NUGGETS, "DEN", "2022-23", "2023-24", 2, 2),
+        (POPEYE_JONES, "Popeye Jones", NUGGETS, "DEN", "2022-23", "2023-24", 2, 0),
+        (BORREGO, "James Borrego", PELICANS, "NOP", "2023-24", "2023-24", 1, 0),
+        (HAM, "Darvin Ham", LAKERS, "LAL", "2022-23", "2022-23", 1, 1),
+    ]
+    assert team_coaches == [
+        ("2022-23", NUGGETS, MALONE, "Michael", "Malone", "Michael Malone", "Head Coach", "DEN"),
+        ("2023-24", NUGGETS, MALONE, "Michael", "Malone", "Michael Malone", "Head Coach", "DEN"),
+    ]
+
+
 class RosterSource(ReplaySource):
     """Replay source that logs team roster requests, times out on the Lakers' while ``lakers_fail``, and while
     ``core_missing`` holds no game logs for that season."""
@@ -92,7 +161,7 @@ def roster_teams(data_root, season):
         ).fetchone()[0]
 
 
-def test_one_failed_team_call_fails_the_item_which_is_retried_and_only_the_latest_season_is_refetched(tmp_path):
+def test_one_failed_team_call_fails_both_items_which_are_retried_and_only_the_latest_season_is_refetched(tmp_path):
     store = Store(tmp_path)
     report = ingest(
         RosterSource(FIXTURES, lakers_fail=True), store, seasons=["2022-23", "2023-24"], datasets=["rosters"],
@@ -104,7 +173,11 @@ def test_one_failed_team_call_fails_the_item_which_is_retried_and_only_the_lates
     nightly = RosterSource(FIXTURES)
     ingest(nightly, store, today=SUMMER)
 
-    assert [item.name for item in report.failed] == ["official_rosters 2022-23", "official_rosters 2023-24"]
+    assert [item.name for item in report.failed] == [
+        "official_rosters 2022-23", "coach_seasons 2022-23", "official_rosters 2023-24", "coach_seasons 2023-24",
+    ]
+    # One call per team and season fills both tables: 3 teams in 2022-23 and 11 in 2023-24.
+    assert len(retry.team_roster_requests) == 14
     assert {season for season, _ in retry.team_roster_requests} == {"2022-23", "2023-24"}
     assert {season for season, _ in nightly.team_roster_requests} == {"2023-24"}
     assert roster_teams(tmp_path, "2022-23") == 3
@@ -118,7 +191,7 @@ def test_a_season_core_doesnt_hold_fails_without_roster_requests_and_succeeds_on
     later = RosterSource(FIXTURES)
     later_report = ingest(later, store, today=SUMMER)
 
-    assert "official_rosters 2022-23" in [item.name for item in report.failed]
+    assert {"official_rosters 2022-23", "coach_seasons 2022-23"} <= {item.name for item in report.failed}
     assert {season for season, _ in source.team_roster_requests} == {"2023-24"}
     assert later_report.failed == []
     assert roster_teams(tmp_path, "2022-23") == 3
@@ -140,5 +213,6 @@ def test_without_rosters_selected_its_views_dont_exist(tmp_path):
 
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
         views = {row[0] for row in con.execute("select view_name from duckdb_views() where not internal").fetchall()}
-    assert "official_rosters" not in views
-    assert "official_roster_details" not in views
+    assert not views & {
+        "official_rosters", "official_roster_details", "coach_seasons", "coaches", "coach_teams", "team_coaches",
+    }

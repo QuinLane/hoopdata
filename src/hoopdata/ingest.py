@@ -21,6 +21,7 @@ PLAYER_ADVANCED_BOX_SCORES = "player_advanced_box_scores"
 TEAM_ADVANCED_BOX_SCORES = "team_advanced_box_scores"
 SHOTS = "shots"
 OFFICIAL_ROSTERS = "official_rosters"
+COACH_SEASONS = "coach_seasons"
 
 ADVANCED = "advanced"
 ROSTERS = "rosters"
@@ -146,7 +147,7 @@ DATASETS = {
     ),
     ROSTERS: Dataset(
         ROSTERS,
-        {TEAM: [(OFFICIAL_ROSTERS, transform.official_rosters)]},
+        {TEAM: [(OFFICIAL_ROSTERS, transform.official_rosters), (COACH_SEASONS, transform.coach_seasons)]},
         lambda source, store, season, season_type, kind: _fetch_team_rosters(source, store, season),
         files("hoopdata").joinpath("rosters_views.sql").read_text(encoding="utf-8"),
         requests_per_item={None: 30},
