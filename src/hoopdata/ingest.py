@@ -9,7 +9,7 @@ import pandas as pd
 from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
-from hoopdata.source import PLAY_IN, PLAYER, REGULAR_SEASON, SEASON_TYPES, TEAM
+from hoopdata.source import PLAY_IN, PLAYER, PLAYOFFS, REGULAR_SEASON, SEASON_TYPES, TEAM
 from hoopdata.store import ALL_SEASONS, CORE, FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
@@ -135,14 +135,20 @@ DATASETS = {
         {TEAM: [(SHOTS, transform.shots)]},
         lambda source, store, season, season_type, kind: _fetch_shot_charts(source, store, season, season_type),
         files("hoopdata").joinpath("shots_views.sql").read_text(encoding="utf-8"),
-        requests_per_item={REGULAR_SEASON: 30},
+        requests_per_item={REGULAR_SEASON: 30, PLAY_IN: 8, PLAYOFFS: 16},
     ),
 }
+
+
+class MissingCoreError(Exception):
+    """Core doesn't hold the season and season type a dataset's fetch reads from it, so the item fails and is retried."""
 
 
 def _fetch_shot_charts(source, store, season, season_type):
     """Each team's shot chart, for every team in core's team box scores of ``season`` and ``season_type``."""
     team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
+    if team_box_scores is None:
+        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
     return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
 
 
