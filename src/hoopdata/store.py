@@ -22,6 +22,9 @@ FAILED = "failed"
 CORE = "core"
 ALL_SEASONS = "all"
 
+# The file name of a season-only partition, one whose source doesn't split by season type.
+SEASON_ONLY_FILE = "season"
+
 
 class Store:
     def __init__(self, data_root):
@@ -112,7 +115,8 @@ class Store:
     def write_partition(self, table, season, season_type, df, dataset=CORE):
         """Atomically write one table/season/season_type partition of ``dataset`` as Parquet.
 
-        ``season`` lives in the hive folder name, so it is left out of the file.
+        ``season`` lives in the hive folder name, so it is left out of the file. A ``season_type`` of
+        ``None`` is a season-only partition.
         """
         _write_parquet(df.drop(columns="season"), self._partition_path(table, season, season_type, dataset))
 
@@ -129,9 +133,10 @@ class Store:
         return _read_parquet(self.root / f"{table}.parquet")
 
     def _partition_path(self, table, season, season_type, dataset):
-        """The Parquet file of one table/season/season_type partition of ``dataset``."""
+        """The Parquet file of one table/season/season_type partition of ``dataset``, ``season.parquet`` if season-only."""
         folder = self.dataset_root(dataset) / table / f"season={season}"
-        return folder / f"{season_type.replace(' ', '_').lower()}.parquet"
+        name = SEASON_ONLY_FILE if season_type is None else season_type.replace(" ", "_").lower()
+        return folder / f"{name}.parquet"
 
     def distinct_values(self, table, column):
         """The distinct values of ``column`` across every partition of ``table``, empty if none are written."""

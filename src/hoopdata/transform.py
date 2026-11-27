@@ -65,6 +65,28 @@ SHOT_TYPES = {
     ),
 }
 
+# The official roster's source columns stored under another name. The rest keep theirs.
+OFFICIAL_ROSTER_COLUMNS = {
+    "teamid": "team_id",
+    "player": "player_name",
+    "num": "jersey_number",
+    "exp": "experience",
+}
+
+OFFICIAL_ROSTER_TYPES = {
+    "season": "string",
+    "team_id": "Int64",
+    "player_id": "Int64",
+    **dict.fromkeys(["player_name", "jersey_number", "position", "experience", "how_acquired"], "string"),
+}
+
+COACH_SEASON_TYPES = {
+    "season": "string",
+    "team_id": "Int64",
+    "coach_id": "Int64",
+    **dict.fromkeys(["first_name", "last_name", "coach_name", "coach_type"], "string"),
+}
+
 PLAYER_COLUMNS = [
     "player_id", "first_name", "last_name", "display_name", "birthdate",
     "height_in", "weight_lb", "position", "country", "school",
@@ -128,6 +150,28 @@ def shots(raws, season, season_type):
     return df[SHOT_COLUMNS].astype(SHOT_TYPES)
 
 
+def official_rosters(raws, season, season_type):
+    """Every player on the teams' official rosters ``raws``, the kept columns as given. ``season_type`` is always
+    ``None``.
+    """
+    df = pd.concat([_result_set(raw) for raw in raws], ignore_index=True).rename(columns=OFFICIAL_ROSTER_COLUMNS)
+    df["season"] = season
+    return df[list(OFFICIAL_ROSTER_TYPES)].astype(OFFICIAL_ROSTER_TYPES)
+
+
+def coach_seasons(raws, season, season_type):
+    """The head and assistant coaches in the teams' staffs ``raws``, the kept columns as given. ``season_type`` is
+    always ``None``.
+
+    The staff is the second result set. A coach is anyone whose type names a head or assistant coach, so trainers
+    and other staff are dropped and new coaching titles are kept.
+    """
+    df = pd.concat([_result_set(raw, 1) for raw in raws], ignore_index=True)
+    df = df[df["coach_type"].str.contains("Head Coach|Assistant Coach", na=False)].copy()
+    df["season"] = season
+    return df[list(COACH_SEASON_TYPES)].astype(COACH_SEASON_TYPES)
+
+
 def _box_scores(df, season, season_type, columns):
     df["season"] = season
     df["season_type"] = season_type
@@ -174,8 +218,8 @@ def _feet_inches_to_inches(height):
     return int(feet) * 12 + int(inches)
 
 
-def _result_set(raw):
-    result = raw["resultSets"][0]
+def _result_set(raw, index=0):
+    result = raw["resultSets"][index]
     df = pd.DataFrame(result["rowSet"], columns=result["headers"])
     df.columns = df.columns.str.lower()
     return df

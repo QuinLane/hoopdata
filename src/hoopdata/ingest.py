@@ -20,8 +20,11 @@ TEAMS = "teams"
 PLAYER_ADVANCED_BOX_SCORES = "player_advanced_box_scores"
 TEAM_ADVANCED_BOX_SCORES = "team_advanced_box_scores"
 SHOTS = "shots"
+OFFICIAL_ROSTERS = "official_rosters"
+COACH_SEASONS = "coach_seasons"
 
 ADVANCED = "advanced"
+ROSTERS = "rosters"
 
 FIRST_SEASON_START_YEAR = 1996
 
@@ -44,7 +47,8 @@ NEW_PLAYERS_PER_SEASON = 90
 # each season and season type (30 seasons, regular season and playoffs, Play-In from 2019-20).
 # Shots: one shot chart per team per season and season type, ~1,400 requests (30 teams in a regular season, 16 in
 # the playoffs, 8 in the Play-In).
-FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400}
+# Rosters: one official roster per team per season, ~930 requests (31 seasons of about 30 teams).
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400, ROSTERS: 930}
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +69,8 @@ class Dataset:
     publishes its views, with ``{root}`` standing for the data root. A fetch can make several
     requests, reading what to ask for from ``store``. ``requests_per_item`` names the season types
     the dataset has and the requests each of their fetches makes; ``None`` means every season type
-    at one request.
+    at one request. A ``None`` season type in it makes the items season-only: one per table and
+    season, fetched with ``season_type`` ``None``.
     """
 
     name: str
@@ -101,7 +106,10 @@ class Dataset:
 
     def _fetches(self, store, season, refetch_complete):
         """``season``'s fetches with failed or missing items, as ``(season_type, kind, tables)``."""
-        season_types = [t for t in _season_types(season) if self.requests_per_item is None or t in self.requests_per_item]
+        if self.requests_per_item is None:
+            season_types = _season_types(season)
+        else:
+            season_types = [t for t in [*_season_types(season), None] if t in self.requests_per_item]
         all_items = {(table, season_type) for season_type in season_types for table in self.table_names}
         to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
         fetches = []
@@ -140,11 +148,18 @@ DATASETS = {
         files("hoopdata").joinpath("shots_views.sql").read_text(encoding="utf-8"),
         requests_per_item={REGULAR_SEASON: 30, PLAY_IN: 8, PLAYOFFS: 16},
     ),
+    ROSTERS: Dataset(
+        ROSTERS,
+        {TEAM: [(OFFICIAL_ROSTERS, transform.official_rosters), (COACH_SEASONS, transform.coach_seasons)]},
+        lambda source, store, season, season_type, kind: _fetch_official_rosters(source, store, season),
+        files("hoopdata").joinpath("rosters_views.sql").read_text(encoding="utf-8"),
+        requests_per_item={None: 30},
+    ),
 }
 
 
 class MissingCoreError(Exception):
-    """Core doesn't hold the season and season type a dataset's fetch reads from it, so the item fails and is retried."""
+    """Core doesn't hold the games a dataset's fetch reads from it, so the item fails and is retried."""
 
 
 def _fetch_shot_charts(source, store, season, season_type):
@@ -153,6 +168,15 @@ def _fetch_shot_charts(source, store, season, season_type):
     if team_box_scores is None:
         raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
     return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
+
+
+def _fetch_official_rosters(source, store, season):
+    """Each team's official roster, for every team in core's team box scores of ``season``, any season type."""
+    partitions = [store.read_partition(TEAM_BOX_SCORES, season, season_type) for season_type in _season_types(season)]
+    team_ids = sorted({team_id for df in partitions if df is not None for team_id in df["team_id"]})
+    if not team_ids:
+        raise MissingCoreError(f"core holds no games for {season} yet")
+    return [source.official_roster(season, team_id) for team_id in team_ids]
 
 
 class EmptySelectionError(Exception):
@@ -165,7 +189,8 @@ class UnknownDatasetError(Exception):
 
 @dataclass
 class Item:
-    """One fetched table, season and season type. ``players`` is one item with no season."""
+    """One fetched table, season and season type. ``players`` is one item with no season, and a season-only item has
+    no season type."""
 
     table: str
     season: str | None
@@ -176,7 +201,7 @@ class Item:
 
     @property
     def name(self):
-        return self.table if self.season is None else f"{self.table} {self.season} {self.season_type}"
+        return " ".join(part for part in [self.table, self.season, self.season_type] if part is not None)
 
 
 @dataclass

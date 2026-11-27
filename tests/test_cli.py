@@ -55,6 +55,7 @@ def test_ingest_help_lists_the_full_backfill_cost_per_dataset(capsys):
     assert "core: about 2,800 requests, roughly 47 min" in out
     assert "advanced: about 135 requests, roughly 2 min" in out
     assert "shots: about 1,400 requests, roughly 23 min" in out
+    assert "rosters: about 930 requests, roughly 16 min" in out
 
 
 def test_ingest_never_prompts(tmp_path, monkeypatch, capsys):
