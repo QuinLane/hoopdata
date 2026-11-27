@@ -128,6 +128,30 @@ def test_coach_views_follow_each_coach_across_teams_and_seasons(db):
     ]
 
 
+class TwoTitlesSource(ReplaySource):
+    """Replay source whose Nuggets 2023-24 report lists Michael Malone twice: as head coach and as an assistant."""
+
+    def official_roster(self, season, team_id):
+        response = super().official_roster(season, team_id)
+        if (season, team_id) == ("2023-24", NUGGETS):
+            coaches = response["resultSets"][1]
+            coach_id = coaches["headers"].index("COACH_ID")
+            coach_type = coaches["headers"].index("COACH_TYPE")
+            malone = next(row for row in coaches["rowSet"] if row[coach_id] == MALONE)
+            coaches["rowSet"].append([*malone[:coach_type], "Assistant Coach", *malone[coach_type + 1:]])
+        return response
+
+
+def test_coach_teams_counts_a_season_once_when_the_coach_is_listed_under_two_titles(tmp_path):
+    ingest(
+        TwoTitlesSource(FIXTURES), Store(tmp_path), seasons=["2022-23", "2023-24"], datasets=["rosters"], today=SUMMER
+    )
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        coach_teams = con.execute("select * from coach_teams where coach_id = ?", [MALONE]).fetchall()
+    assert coach_teams == [(MALONE, "Michael Malone", NUGGETS, "DEN", "2022-23", "2023-24", 2, 2)]
+
+
 class OfficialRosterSource(ReplaySource):
     """Replay source that logs official roster requests, times out on the Lakers' while ``lakers_fail``, and while
     ``core_missing`` holds no game logs for that season."""
