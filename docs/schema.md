@@ -199,7 +199,7 @@ select schema_version, last_updated, seasons from hoopdata_info
 
 ### `hoopdata_datasets`
 
-One row per dataset in the data root's selection, core included. Like `hoopdata_info`, it reads `manifest.json` at query time. It is written at the end of every ingest. A selected dataset's own views are published once it has any data.
+One row per dataset in the data root's selection, core included. Like `hoopdata_info`, it reads `manifest.json` at query time. It is written at the end of every ingest. A selected dataset's own views are published once each of its tables has data.
 
 | Column | Type | Meaning |
 |---|---|---|

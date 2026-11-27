@@ -252,3 +252,35 @@ def test_last_updated_is_when_each_dataset_last_fetched_an_item(tmp_path, fake):
         ("core", core_fetched), ("fake", fake_fetched),
     ]
     assert fake_fetched > core_fetched
+
+
+class TwoTableFakeDataset(FakeDataset):
+    """A fake dataset with a second table, ``fake_extras``, whose requests always fail."""
+
+    def __init__(self):
+        super().__init__()
+        self.tables = {**self.tables, "extras": [("fake_extras", self._to_table)]}
+        self.views += """
+            create view fake_extras as
+            select * from read_parquet(
+                '{root}/fake/fake_extras/*/*.parquet',
+                hive_partitioning = true,
+                hive_types = {'season': varchar}
+            );
+        """
+
+    def _fetch(self, source, season, season_type, kind):
+        if kind == "extras":
+            raise ConnectionError("timed out")
+        return super()._fetch(source, season, season_type, kind)
+
+
+def test_a_datasets_views_wait_until_every_one_of_its_tables_has_data(tmp_path, monkeypatch):
+    monkeypatch.setitem(DATASETS, "fake", TwoTableFakeDataset())
+
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2023-24"], datasets=["fake"], today=SUMMER)
+
+    assert (tmp_path / "fake" / "fake_scores").is_dir()
+    assert "fake_scores" not in published_views(tmp_path)
+    assert "fake_extras" not in published_views(tmp_path)
+    assert "player_box_scores" in published_views(tmp_path)

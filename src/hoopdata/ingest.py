@@ -61,6 +61,11 @@ class Dataset:
     fetch: object
     views: str
 
+    @property
+    def table_names(self):
+        """Every table the dataset writes."""
+        return {table for tables in self.tables.values() for table, _ in tables}
+
     def to_fetch(self, store, seasons, latest):
         """The requests with failed or missing items in ``seasons``, as ``(season, season_type, kind, tables)``.
 
@@ -177,8 +182,10 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
         store.write_datasets([_dataset_status(store, name, selected) for name in selection["datasets"]])
-        # A dataset's views are published once it has any data, so a partly backfilled one shows up straight away.
-        store.publish([DATASETS[name].views for name in selection["datasets"] if store.has_data(name)])
+        # A dataset's views are published once each of its tables has data, so a partly backfilled one shows up early.
+        store.publish([
+            DATASETS[name].views for name in selection["datasets"] if store.has_data(name, DATASETS[name].table_names)
+        ])
     return report
 
 

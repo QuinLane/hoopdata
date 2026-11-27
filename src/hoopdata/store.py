@@ -39,9 +39,9 @@ class Store:
         """Where ``dataset``'s tables live: the data root for core, its own top-level folder for the others."""
         return self.root if dataset == CORE else self.root / dataset
 
-    def has_data(self, dataset):
-        """Whether ``dataset`` has any Parquet files yet. DuckDB can't create a view over none."""
-        return any(self.dataset_root(dataset).rglob("*.parquet"))
+    def has_data(self, dataset, tables):
+        """Whether each of ``dataset``'s ``tables`` has any Parquet files yet. DuckDB can't create a view over none."""
+        return all(any((self.dataset_root(dataset) / table).rglob("*.parquet")) for table in tables)
 
     def new_log_path(self):
         """A fresh log file path for one run, named by its start time."""
