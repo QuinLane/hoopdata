@@ -219,6 +219,7 @@ select dataset, last_updated, complete from hoopdata_datasets
 {
   "schema_version": 1,
   "last_updated": "2026-11-26T11:00:00.123456+00:00",
+  "selection": {"datasets": ["core"], "seasons": ["2022-23", "2023-24"]},
   "items": [
     {
       "table": "player_box_scores",
@@ -239,14 +240,15 @@ select dataset, last_updated, complete from hoopdata_datasets
 
 - **`schema_version`**: the version of this schema.
 - **`last_updated`**: UTC time the latest item was recorded.
+- **`selection`**: what the data root holds, saved by every ingest and added to by `--season`, `--all-seasons` and `--datasets`. `datasets` lists the selected datasets, core first. `seasons` is `"all"` (every season from 1996-97 on, including future ones) or a list of seasons. A selection only grows. Deleting a dataset's folder removes it on the next ingest. A v1 manifest without `selection` is read as core with all seasons.
 - **`items`**: one entry per table, season and season type (no `PlayIn` items before 2019-20), holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
 - **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
 - **`datasets`**: each selected dataset's status as of the latest run, read by `hoopdata_datasets`.
-- **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
+- **`views_hash`**: internal. A fingerprint of the published views, the schema version and the selection, used to decide when `hoopdata.duckdb` must be rebuilt.
 
 ## When `hoopdata.duckdb` is rebuilt
 
-Only when the views or the schema version change, or on the next ingest after the data root moves (the views hold absolute paths). New data needs no rebuild: the views read the Parquet files and the manifest at query time.
+Only when the views, the schema version or the selection change (a season or dataset added, or a dataset's folder deleted), or on the next ingest after the data root moves (the views hold absolute paths). New data needs no rebuild: the views read the Parquet files and the manifest at query time.
 
 ## Schema version
 
