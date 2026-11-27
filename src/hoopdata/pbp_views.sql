@@ -92,12 +92,13 @@ with assisted as (
     where action_type = 'Made Shot' and description like '%AST)'
 )
 select
-    games.season, games.season_type, assisted.game_id, assisted.action_id, assisted.period, assisted.clock,
+    box.season, box.season_type, assisted.game_id, assisted.action_id, assisted.period, assisted.clock,
     assisted.team_id, assisted.player_id,
     case when count(teammates.player_id) = 1 then any_value(teammates.player_id) end as assist_player_id,
     assisted.assist_player_name, assisted.shot_value
 from assisted
-join games using (game_id)
+-- The season type comes from the team box scores, as in pbp_reconciliation: they hold every held game, games may not.
+join (select distinct season, season_type, game_id from team_box_scores) as box using (game_id)
 left join player_box_scores as teammates
     on teammates.game_id = assisted.game_id
     and teammates.team_id = assisted.team_id

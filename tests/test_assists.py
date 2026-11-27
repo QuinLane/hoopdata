@@ -87,6 +87,35 @@ def test_an_assister_whose_surname_two_teammates_share_is_left_unresolved_with_t
     assert row == (PORTER, None, "Murray")
 
 
+class OneSidedOpenerSource(ReplaySource):
+    """Replay source whose team game log leaves out Dallas's side of the opener, so games doesn't hold it."""
+
+    def game_log(self, season, season_type, kind):
+        response = super().game_log(season, season_type, kind)
+        result = response["resultSets"][0]
+        if kind == "team":
+            columns = result["headers"]
+            result["rowSet"] = [
+                row for row in result["rowSet"]
+                if (row[columns.index("GAME_ID")], row[columns.index("TEAM_ID")]) != (OPENER, MAVERICKS)
+            ]
+        return response
+
+
+def test_assisted_shots_of_a_game_missing_from_games_are_kept(tmp_path):
+    ingest(OneSidedOpenerSource(FIXTURES), Store(tmp_path), seasons=["2023-24"], datasets=["pbp"], today=SUMMER)
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        in_games = con.execute("select count(*) from games where game_id = ?", [OPENER]).fetchone()[0]
+        rows = con.execute(
+            "select season, season_type, count(*) from assists where game_id = ? group by all", [OPENER]
+        ).fetchall()
+
+    assert in_games == 0
+    # Both teams' 60 assisted shots, as when games holds the opener.
+    assert rows == [("2023-24", "Regular Season", 60)]
+
+
 def test_assist_pairs_total_the_resolved_assists_per_assister_and_scorer(db):
     pair = db.execute(
         """

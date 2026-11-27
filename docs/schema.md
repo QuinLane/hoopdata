@@ -488,7 +488,7 @@ One row per assisted made shot: a `Made Shot` action whose `description` ends wi
 
 | Column | Type | Meaning |
 |---|---|---|
-| `season`, `season_type` | VARCHAR | The game's season and season type, from `games` |
+| `season`, `season_type` | VARCHAR | The game's season and season type, from `team_box_scores`, which holds every game in `play_by_play` |
 | `game_id`, `action_id` | | Key, as in `play_by_play` |
 | `period` | BIGINT | Period, as in `play_by_play` |
 | `clock` | VARCHAR | Time left in the period, as in `play_by_play` |
