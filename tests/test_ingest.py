@@ -892,9 +892,20 @@ class PrintedBeforeRequestSource(ReplaySource):
         self.printed_before_first_request = None
 
     def game_log(self, season, season_type, kind):
+        self._capture()
+        return super().game_log(season, season_type, kind)
+
+    def all_players(self):
+        self._capture()
+        return super().all_players()
+
+    def player_info(self, player_id):
+        self._capture()
+        return super().player_info(player_id)
+
+    def _capture(self):
         if self.printed_before_first_request is None:
             self.printed_before_first_request = self.capsys.readouterr().out
-        return super().game_log(season, season_type, kind)
 
 
 def test_refetching_only_the_latest_season_prints_its_small_estimate_before_any_request(tmp_path, capsys):
@@ -908,10 +919,22 @@ def test_refetching_only_the_latest_season_prints_its_small_estimate_before_any_
     assert "About 6 requests, roughly 6 s (core: 6)" in source.printed_before_first_request
 
 
-def test_a_first_all_seasons_run_estimates_one_request_per_game_log_in_minutes(tmp_path, capsys):
+def test_a_first_all_seasons_run_estimates_its_game_logs_and_90_new_player_bios_per_season(tmp_path, capsys):
     ingest(BackfillSource(FIXTURES), Store(tmp_path), seasons=ALL_SEASONS, today=date(2024, 11, 26))
 
-    assert "About 128 requests, roughly 2 min (core: 128)" in capsys.readouterr().out
+    # 29 seasons: 2 kinds x (2 season types x 29 + Play-In x 6) = 128 game logs, plus 90 bios x 29 = 2,610.
+    assert "About 2,738 requests, roughly 46 min (core: 2,738)" in capsys.readouterr().out
+
+
+def test_adding_a_season_guesses_bios_only_for_the_new_season(tmp_path, capsys):
+    store = Store(tmp_path)
+    ingest(FailingPlayoffsAndJokicSource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
+    capsys.readouterr()
+
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 7, 1))
+
+    # 2022-23: its failed game log and Jokic's missing bio. 2023-24: 6 game logs and a guess of 90 bios.
+    assert "About 98 requests, roughly 2 min (core: 98)" in capsys.readouterr().out
 
 
 def test_play_in_games_are_stored_as_their_own_season_type(db):

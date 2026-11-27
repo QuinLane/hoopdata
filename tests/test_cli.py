@@ -64,7 +64,7 @@ def test_ingest_never_prompts(tmp_path, monkeypatch, capsys):
     exit_code = main(["ingest", "--season", "2023-24", "--data-root", str(tmp_path)], source=ReplaySource(FIXTURES))
 
     assert exit_code == 0
-    assert "About 6 requests" in capsys.readouterr().out
+    assert "About 96 requests" in capsys.readouterr().out
 
 
 def test_plain_ingest_on_an_empty_data_root_is_refused_and_fetches_nothing(tmp_path, monkeypatch, capsys):

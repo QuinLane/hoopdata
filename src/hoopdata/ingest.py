@@ -29,8 +29,12 @@ BIOS_PER_WRITE = 20
 # The source paces requests about this far apart, which the time estimate assumes.
 SECONDS_PER_REQUEST = 1
 
+# The estimate's guess at how many new players' bios a season held for the first time needs.
+NEW_PLAYERS_PER_SEASON = 90
+
 # Rough requests for each dataset's full backfill of every season, shown in --help.
-# Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player bios.
+# Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player
+# bios (NEW_PLAYERS_PER_SEASON for each season).
 FULL_BACKFILL_REQUESTS = {CORE: 2_800}
 
 log = logging.getLogger(__name__)
@@ -161,7 +165,9 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
     game_logs = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
     requests = {name: len(to_fetch) for name, to_fetch in game_logs.items()}
-    requests[CORE] += len(_players_without_bios(store))
+    requests[CORE] += len(_players_without_bios(store)) + NEW_PLAYERS_PER_SEASON * len(
+        _seasons_without_box_scores(store, game_logs[CORE])
+    )
     print(_estimate(requests))
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
@@ -223,11 +229,17 @@ def _dataset_status(store, name, seasons):
     return {"dataset": name, "last_updated": max(fetched, default=None), "complete": complete}
 
 
-def _estimate(requests):
-    """A line like ``About 38,400 requests, roughly 11 h (pbp: 37,900 · core: 500)`` from requests per dataset.
+def _seasons_without_box_scores(store, to_fetch):
+    """The seasons in core's ``to_fetch`` with no stored player box scores yet, whose new players are only a guess."""
+    seasons = {season for season, _, _, _ in to_fetch}
+    return {
+        season for season in seasons
+        if not any(table == PLAYER_BOX_SCORES for table, _ in store.succeeded_items(season))
+    }
 
-    Bios of players first seen in this run's game logs can't be known yet, so they aren't counted.
-    """
+
+def _estimate(requests):
+    """A line like ``About 38,400 requests, roughly 11 h (pbp: 37,900 · core: 500)`` from requests per dataset."""
     total = sum(requests.values())
     breakdown = " · ".join(f"{dataset}: {count:,}" for dataset, count in requests.items())
     return f"About {total:,} requests, roughly {_duration(total * SECONDS_PER_REQUEST)} ({breakdown})"
