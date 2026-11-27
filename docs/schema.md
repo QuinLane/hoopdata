@@ -442,6 +442,43 @@ Each team's coaches per season: every `coach_seasons` column, plus this. Only pu
 |---|---|---|
 | `team_abbreviation` | VARCHAR | Team abbreviation in the team's latest game of the season in `team_box_scores` |
 
+### `pbp_reconciliation` (pbp dataset)
+
+Whether a game's play-by-play adds up to its box scores: one row per game held in `play_by_play` and team in that game's `team_box_scores`. Only published when `pbp` is in the selection. A mismatch is only reported here: it never fails an item or blocks publishing.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
+| `game_id` | VARCHAR | NBA game ID |
+| `team_id` | BIGINT | NBA team ID |
+| `pbp_<stat>` | BIGINT | The stat summed from the team's actions, `0` when it has none |
+| `box_<stat>` | BIGINT | The same stat in `team_box_scores` |
+| `matches` | BOOLEAN | Every `pbp_<stat>` equals its `box_<stat>` |
+
+`<stat>` is each of `pts`, `fgm`, `fga`, `fg3m`, `fg3a`, `ftm`, `fta`, `reb`, `ast`, `stl`, `blk`, `tov` and `pf`, counted from the team's actions (`team_id`) like this:
+
+- **Field goals**: `fga` counts `Made Shot` and `Missed Shot` actions, `fgm` the `Made Shot`s; `fg3a` and `fg3m` the same with `shot_value` 3.
+- **Free throws**: `fta` counts `Free Throw` actions, `ftm` those whose `description` doesn't start with `MISS`.
+- **`pts`**: `shot_value` of each `Made Shot`, plus `ftm`.
+- **`reb`**: `Rebound` actions by a player. Team rebounds (`person_id` NULL) aren't counted, as in the box score.
+- **`ast`**: `Made Shot` actions whose `description` holds `AST)`, like `(Jokic 1 AST)`.
+- **`stl`** and **`blk`**: actions whose `description` holds `STEAL` or `BLOCK` (their `action_type` is empty).
+- **`tov`**: `Turnover` actions, team turnovers included.
+- **`pf`**: `Foul` actions except technicals: `sub_type` `Technical`, `Double Technical`, `Defense 3 Second` and `Flopping` (a non-unsportsmanlike technical) aren't counted. Flagrant, take and away-from-play fouls are. Pinned against the fixture games, where it matches every team; counting every `Foul` overcounts by the technicals. Coaches' technicals have `team_id` 0, so they're never a team's.
+
+### `pbp_reconciliation_seasons` (pbp dataset)
+
+How much of each season's play-by-play reconciles, as a guide to which eras to trust: one row per season and season type in `pbp_reconciliation`. Only published when `pbp` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
+| `games` | BIGINT | Games held in `play_by_play` |
+| `matching_games` | BIGINT | Games where both teams' `matches` is true |
+| `matching_share` | DOUBLE | `matching_games / games` |
+
 ### `hoopdata_info`
 
 One row describing the data. It reads `manifest.json` at query time, so it shows the latest run without reopening or rebuilding anything.
