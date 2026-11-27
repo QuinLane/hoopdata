@@ -39,8 +39,9 @@ NEW_PLAYERS_PER_SEASON = 90
 # Rough requests for each dataset's full backfill of every season, shown in --help.
 # Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player
 # bios (NEW_PLAYERS_PER_SEASON for each season).
-# Advanced: one league-wide player and one team game log per season and season type, ~125 requests.
-FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 125}
+# Advanced: ~135 requests, counted like core's game logs: one league-wide request per table (player and team) for
+# each season and season type (30 seasons, regular season and playoffs, Play-In from 2019-20).
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135}
 
 log = logging.getLogger(__name__)
 
