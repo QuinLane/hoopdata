@@ -9,7 +9,7 @@ import pandas as pd
 from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
-from hoopdata.source import PLAY_IN, PLAYER, REGULAR_SEASON, SEASON_TYPES, TEAM
+from hoopdata.source import PLAY_IN, PLAYER, PLAYOFFS, REGULAR_SEASON, SEASON_TYPES, TEAM
 from hoopdata.store import ALL_SEASONS, CORE, FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
@@ -40,10 +40,11 @@ NEW_PLAYERS_PER_SEASON = 90
 # Rough requests for each dataset's full backfill of every season, shown in --help.
 # Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player
 # bios (NEW_PLAYERS_PER_SEASON for each season).
-# Advanced: one league-wide player and one team game log per season and season type, ~125 requests.
+# Advanced: ~135 requests, counted like core's game logs: one league-wide request per table (player and team) for
+# each season and season type (30 seasons, regular season and playoffs, Play-In from 2019-20).
 # Shots: one shot chart per team per season and season type, ~1,400 requests (30 teams in a regular season, 16 in
 # the playoffs, 8 in the Play-In).
-FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 125, SHOTS: 1_400}
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400}
 
 log = logging.getLogger(__name__)
 
@@ -126,11 +127,7 @@ DATASETS = {
             PLAYER: [(PLAYER_ADVANCED_BOX_SCORES, transform.player_advanced_box_scores)],
             TEAM: [(TEAM_ADVANCED_BOX_SCORES, transform.team_advanced_box_scores)],
         },
-        lambda source, store, season, season_type, kind: (
-            source.player_advanced_game_log(season, season_type)
-            if kind == PLAYER
-            else source.team_advanced_game_log(season, season_type)
-        ),
+        lambda source, store, season, season_type, kind: source.advanced_box_scores(season, season_type, kind),
         files("hoopdata").joinpath("advanced_views.sql").read_text(encoding="utf-8"),
     ),
     SHOTS: Dataset(
@@ -138,14 +135,20 @@ DATASETS = {
         {TEAM: [(SHOTS, transform.shots)]},
         lambda source, store, season, season_type, kind: _fetch_shot_charts(source, store, season, season_type),
         files("hoopdata").joinpath("shots_views.sql").read_text(encoding="utf-8"),
-        requests_per_item={REGULAR_SEASON: 30},
+        requests_per_item={REGULAR_SEASON: 30, PLAY_IN: 8, PLAYOFFS: 16},
     ),
 }
+
+
+class MissingCoreError(Exception):
+    """Core doesn't hold the season and season type a dataset's fetch reads from it, so the item fails and is retried."""
 
 
 def _fetch_shot_charts(source, store, season, season_type):
     """Each team's shot chart, for every team in core's team box scores of ``season`` and ``season_type``."""
     team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
+    if team_box_scores is None:
+        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
     return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
 
 

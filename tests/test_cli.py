@@ -53,7 +53,7 @@ def test_ingest_help_lists_the_full_backfill_cost_per_dataset(capsys):
 
     out = " ".join(capsys.readouterr().out.split())
     assert "core: about 2,800 requests, roughly 47 min" in out
-    assert "advanced: about 125 requests, roughly 2 min" in out
+    assert "advanced: about 135 requests, roughly 2 min" in out
     assert "shots: about 1,400 requests, roughly 23 min" in out
 
 
