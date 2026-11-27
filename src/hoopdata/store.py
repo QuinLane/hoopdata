@@ -22,6 +22,9 @@ FAILED = "failed"
 CORE = "core"
 ALL_SEASONS = "all"
 
+# The file name of a season-only partition, one whose source doesn't split by season type.
+SEASON_ONLY_FILE = "season"
+
 
 class Store:
     def __init__(self, data_root):
@@ -112,16 +115,14 @@ class Store:
     def write_partition(self, table, season, season_type, df, dataset=CORE):
         """Atomically write one table/season/season_type partition of ``dataset`` as Parquet.
 
-        ``season`` lives in the hive folder name, so it is left out of the file.
+        ``season`` lives in the hive folder name, so it is left out of the file. A ``season_type`` of
+        ``None`` is a season-only partition.
         """
-        folder = self.dataset_root(dataset) / table / f"season={season}"
-        path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
-        _write_parquet(df.drop(columns="season"), path)
+        _write_parquet(df.drop(columns="season"), self._partition_path(table, season, season_type, dataset))
 
     def read_partition(self, table, season, season_type, dataset=CORE):
         """Read one table/season/season_type partition of ``dataset``, or ``None`` if it hasn't been written yet."""
-        folder = self.dataset_root(dataset) / table / f"season={season}"
-        path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
+        path = self._partition_path(table, season, season_type, dataset)
         if not path.exists():
             return None
         with duckdb.connect() as con:
@@ -166,6 +167,11 @@ class Store:
             con.execute(sql)
         os.replace(temp, self.database_path)
         self._write_manifest_key("views_hash", views_hash)
+
+    def _partition_path(self, table, season, season_type, dataset):
+        folder = self.dataset_root(dataset) / table / f"season={season}"
+        name = SEASON_ONLY_FILE if season_type is None else season_type.replace(" ", "_").lower()
+        return folder / f"{name}.parquet"
 
     def _write_manifest_key(self, key, value):
         """Set one top-level key of the manifest, keeping the rest."""
