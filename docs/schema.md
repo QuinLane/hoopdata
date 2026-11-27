@@ -137,6 +137,39 @@ Keys only for identity: names, dates, results and team abbreviations come from c
 
 Not stored from the source: the `E_*` estimated versions (a second estimate of the same stat, ADR 0001), the `sp_work_*` internal copies, every `*_RANK` column (ranks only mean something inside one response), the copies of core data (`FGM`, `FGA`, `FG_PCT`, `MIN`, names, date, matchup, `WL`) and `AVAILABLE_FLAG`, `MIN_SEC` and `TEAM_COUNT`.
 
+### `team_advanced_box_scores` (advanced dataset)
+
+One row per team per game, holding NBA's official advanced stats exactly as given. Only in a data root whose selection includes `advanced`. Source: the stats.nba.com team game logs with the Advanced measure type, one league-wide request per season and season type. Stored as Parquet under `advanced/team_advanced_box_scores/season=<season>/`, one file per season type.
+
+Keys only for identity: team abbreviations, dates and results come from core (see `team_advanced_game_stats`). The `(game_id, team_id)` keys match `team_box_scores` exactly: every advanced row has a core row and every core row has an advanced row. This was checked against the live API (1996-97 Regular Season, 2024-25 Playoffs); there's no runtime check.
+
+The columns are the player table's without `player_id` and `usg_pct` (NBA gives no usage for teams). Note `tm_tov_pct` is a fraction here but a percent in `player_advanced_box_scores`; both are as NBA gives them.
+
+| Column | Type | Meaning | Scale |
+|---|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` | |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` | |
+| `game_id` | VARCHAR | NBA game ID, leading zeros kept | |
+| `team_id` | BIGINT | NBA team ID | |
+| `off_rating` | DOUBLE | Offensive rating: points per 100 possessions | Points per 100 (`111.1`) |
+| `def_rating` | DOUBLE | Defensive rating: opponent points per 100 possessions | Points per 100 (`113.9`) |
+| `net_rating` | DOUBLE | `off_rating - def_rating` | Points per 100 (`-2.8`) |
+| `ast_pct` | DOUBLE | Share of the team's field goals that were assisted | Fraction (`0.787`) |
+| `ast_to` | DOUBLE | Assists per turnover | Ratio (`2.85`) |
+| `ast_ratio` | DOUBLE | Assists per 100 possessions | Per 100 (`24.8`) |
+| `oreb_pct` | DOUBLE | Share of available offensive rebounds grabbed | Fraction (`0.245`) |
+| `dreb_pct` | DOUBLE | Share of available defensive rebounds grabbed | Fraction (`0.824`) |
+| `reb_pct` | DOUBLE | Share of available rebounds grabbed | Fraction (`0.529`) |
+| `tm_tov_pct` | DOUBLE | Turnovers per possession | Fraction (`0.131`) |
+| `efg_pct` | DOUBLE | Effective field goal percentage | Fraction (`0.542`) |
+| `ts_pct` | DOUBLE | True shooting percentage | Fraction (`0.543`) |
+| `pace` | DOUBLE | Possessions per 48 minutes | Per 48 (`100.0`) |
+| `pace_per40` | DOUBLE | Possessions per 40 minutes | Per 40 (`83.33`) |
+| `poss` | BIGINT | Possessions played | Count (`99`) |
+| `pie` | DOUBLE | Team's share of the game's events (NBA's PIE for a team) | Fraction (`0.479`) |
+
+Not stored from the source: the `E_*` estimated versions (ADR 0001), every `*_RANK` column, the copies of core data (`MIN`, team abbreviation and name, date, matchup, `WL`) and `AVAILABLE_FLAG`.
+
 ## Views
 
 ### `player_game_stats`
@@ -226,6 +259,16 @@ Per-game player advanced stats with core's names, dates and results: every `play
 | `team_abbreviation` | VARCHAR | Team abbreviation at the time of the game |
 | `game_date` | DATE | Date the game was played |
 | `wl` | VARCHAR | `W` or `L` for the player's team |
+
+### `team_advanced_game_stats` (advanced dataset)
+
+Per-game team advanced stats with core's team abbreviation, date and result: every `team_advanced_box_scores` column, plus these from the matching `team_box_scores` row (joined on `game_id` and `team_id`). Only published when `advanced` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `team_abbreviation` | VARCHAR | Team abbreviation at the time of the game |
+| `game_date` | DATE | Date the game was played |
+| `wl` | VARCHAR | `W` or `L` |
 
 ### `hoopdata_info`
 
