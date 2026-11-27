@@ -26,6 +26,20 @@ BOX_SCORE_TYPES = {
     **dict.fromkeys(["player_id", "team_id", *STAT_COLUMNS], "Int64"),
 }
 
+# NBA's official advanced rates, stored as given (ADR 0001). poss is a count, the rest are rates.
+ADVANCED_STAT_COLUMNS = [
+    "off_rating", "def_rating", "net_rating", "ast_pct", "ast_to", "ast_ratio", "oreb_pct", "dreb_pct",
+    "reb_pct", "tm_tov_pct", "efg_pct", "ts_pct", "usg_pct", "pace", "pace_per40", "poss", "pie",
+]
+
+PLAYER_ADVANCED_BOX_SCORE_COLUMNS = ["season", "season_type", "game_id", "player_id", "team_id", *ADVANCED_STAT_COLUMNS]
+
+ADVANCED_BOX_SCORE_TYPES = {
+    **dict.fromkeys(["season", "season_type", "game_id"], "string"),
+    **dict.fromkeys(["player_id", "team_id", "poss"], "Int64"),
+    **dict.fromkeys([column for column in ADVANCED_STAT_COLUMNS if column != "poss"], "Float64"),
+}
+
 PLAYER_COLUMNS = [
     "player_id", "first_name", "last_name", "display_name", "birthdate",
     "height_in", "weight_lb", "position", "country", "school",
@@ -63,6 +77,15 @@ def games(raw, season, season_type):
         "home_pts": df["pts_home"].astype("Int64"),
         "away_pts": df["pts_away"].astype("Int64"),
     })
+
+
+def player_advanced_box_scores(raw, season, season_type):
+    """The keys and official rates of an advanced player game log, values as given."""
+    df = _result_set(raw)
+    df["season"] = season
+    df["season_type"] = season_type
+    columns = PLAYER_ADVANCED_BOX_SCORE_COLUMNS
+    return df[columns].astype({column: ADVANCED_BOX_SCORE_TYPES[column] for column in columns})
 
 
 def _box_scores(df, season, season_type, columns):

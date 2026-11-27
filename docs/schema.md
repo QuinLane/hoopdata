@@ -13,7 +13,7 @@ con.sql("select * from player_season_averages").df()
 - **Keys** are NBA's own IDs. `game_id` is a string with leading zeros kept (`0022300061`). `player_id` and `team_id` are integers.
 - **`season`** is a string like `2023-24`.
 - **`season_type`** is `Regular Season`, `PlayIn` or `Playoffs`. Play-In games exist from 2019-20 on (including the 2019-20 bubble game NBA labels Play-In); earlier seasons have none.
-- **Stored tables hold raw counts only.** Every percentage is calculated in a view.
+- **Stored tables hold raw counts only.** Every percentage is calculated in a view. The exception is the `advanced` dataset's tables, which hold NBA's official advanced rates exactly as given, with no rescaling (ADR 0001). Some are fractions and some are percents; each column's scale is documented with its table.
 - **Missing values** are `NULL`; integer columns stay integers.
 
 ## Tables
@@ -104,6 +104,39 @@ One row per current NBA team. Current identity only; historical names live on th
 | `full_name` | VARCHAR | City and nickname |
 | `year_founded` | BIGINT | Year the franchise was founded |
 
+### `player_advanced_box_scores` (advanced dataset)
+
+One row per player per game, holding NBA's official advanced stats exactly as given. Only in a data root whose selection includes `advanced`. Source: the stats.nba.com player game logs with the Advanced measure type, one league-wide request per season and season type. Stored as Parquet under `advanced/player_advanced_box_scores/season=<season>/`, one file per season type.
+
+Keys only for identity: names, dates, results and team abbreviations come from core (see `player_advanced_game_stats`). The `(game_id, player_id)` keys match `player_box_scores` exactly: every advanced row has a core row and every core row has an advanced row. This was checked against the live API (1996-97 Regular Season, 2024-25 Playoffs); there's no runtime check.
+
+| Column | Type | Meaning | Scale |
+|---|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` | |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` | |
+| `game_id` | VARCHAR | NBA game ID, leading zeros kept | |
+| `player_id` | BIGINT | NBA player ID | |
+| `team_id` | BIGINT | NBA team ID the player played for in that game | |
+| `off_rating` | DOUBLE | Offensive rating: team points per 100 possessions while on court | Points per 100 (`129.2`) |
+| `def_rating` | DOUBLE | Defensive rating: opponent points per 100 possessions while on court | Points per 100 (`122.2`) |
+| `net_rating` | DOUBLE | `off_rating - def_rating` | Points per 100 (`6.9`) |
+| `ast_pct` | DOUBLE | Share of teammates' field goals the player assisted while on court | Fraction (`0.621`) |
+| `ast_to` | DOUBLE | Assists per turnover | Ratio (`4.5`) |
+| `ast_ratio` | DOUBLE | Assists per 100 of the player's possessions | Per 100 (`41.9`) |
+| `oreb_pct` | DOUBLE | Share of available offensive rebounds grabbed while on court | Fraction (`0.063`) |
+| `dreb_pct` | DOUBLE | Share of available defensive rebounds grabbed while on court | Fraction (`0.4`) |
+| `reb_pct` | DOUBLE | Share of available rebounds grabbed while on court | Fraction (`0.239`) |
+| `tm_tov_pct` | DOUBLE | Turnovers per 100 of the player's possessions | Percent (`9.3`) |
+| `efg_pct` | DOUBLE | Effective field goal percentage | Fraction (`0.525`) |
+| `ts_pct` | DOUBLE | True shooting percentage | Fraction (`0.586`) |
+| `usg_pct` | DOUBLE | Share of team possessions the player used while on court | Fraction (`0.313`) |
+| `pace` | DOUBLE | Possessions per 48 minutes | Per 48 (`95.56`) |
+| `pace_per40` | DOUBLE | Possessions per 40 minutes | Per 40 (`79.63`) |
+| `poss` | BIGINT | Possessions played | Count (`72`) |
+| `pie` | DOUBLE | Player Impact Estimate: share of the game's events the player contributed | Fraction (`0.234`) |
+
+Not stored from the source: the `E_*` estimated versions (a second estimate of the same stat, ADR 0001), the `sp_work_*` internal copies, every `*_RANK` column (ranks only mean something inside one response), the copies of core data (`FGM`, `FGA`, `FG_PCT`, `MIN`, names, date, matchup, `WL`) and `AVAILABLE_FLAG`, `MIN_SEC` and `TEAM_COUNT`.
+
 ## Views
 
 ### `player_game_stats`
@@ -182,6 +215,17 @@ Each team's roster per season and season type: only players who appeared in a ga
 | `team_abbreviation` | VARCHAR | Team abbreviation in the player's latest game for that team |
 | `player_name` | VARCHAR | Name in the player's latest game for that team |
 | `games_played` | BIGINT | Games the player appeared in for that team |
+
+### `player_advanced_game_stats` (advanced dataset)
+
+Per-game player advanced stats with core's names, dates and results: every `player_advanced_box_scores` column, plus these from the matching `player_box_scores` row (joined on `game_id` and `player_id`). Only published when `advanced` is in the selection. There are no season-level advanced views: averaging per-game ratings isn't the official season rating.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `player_name` | VARCHAR | Player's name as listed in that game |
+| `team_abbreviation` | VARCHAR | Team abbreviation at the time of the game |
+| `game_date` | DATE | Date the game was played |
+| `wl` | VARCHAR | `W` or `L` for the player's team |
 
 ### `hoopdata_info`
 

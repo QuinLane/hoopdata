@@ -123,7 +123,7 @@ def test_all_adds_every_dataset(tmp_path, fake):
 
     main(["ingest", "--data-root", str(tmp_path), "--datasets", "all"], source=ReplaySource(FIXTURES))
 
-    assert manifest(tmp_path)["selection"]["datasets"] == ["core", "fake"]
+    assert manifest(tmp_path)["selection"]["datasets"] == ["core", "advanced", "fake"]
 
 
 def published_views(data_root):

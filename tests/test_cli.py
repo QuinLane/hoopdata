@@ -51,7 +51,9 @@ def test_ingest_help_lists_the_full_backfill_cost_per_dataset(capsys):
     with pytest.raises(SystemExit):
         main(["ingest", "--help"])
 
-    assert "core: about 2,800 requests, roughly 47 min" in " ".join(capsys.readouterr().out.split())
+    out = " ".join(capsys.readouterr().out.split())
+    assert "core: about 2,800 requests, roughly 47 min" in out
+    assert "advanced: about 63 requests, roughly 1 min" in out
 
 
 def test_ingest_never_prompts(tmp_path, monkeypatch, capsys):
