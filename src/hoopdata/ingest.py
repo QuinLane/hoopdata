@@ -75,22 +75,20 @@ class Dataset:
         return [
             (season, season_type, kind, tables)
             for season in seasons
-            for season_type, kind, tables in self._game_logs_to_fetch(store, season, season == latest)
+            for season_type, kind, tables in self._requests_to_fetch(store, season, season == latest)
         ]
 
-    def _game_logs_to_fetch(self, store, season, refetch_complete):
+    def _requests_to_fetch(self, store, season, refetch_complete):
         season_types = _season_types(season)
-        all_items = {
-            (table, season_type) for season_type in season_types for tables in self.tables.values() for table, _ in tables
-        }
+        all_items = {(table, season_type) for season_type in season_types for table in self.table_names}
         to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
-        game_logs = []
+        requests = []
         for season_type in season_types:
             for kind, tables in self.tables.items():
                 tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
                 if tables:
-                    game_logs.append((season_type, kind, tables))
-        return game_logs
+                    requests.append((season_type, kind, tables))
+        return requests
 
 
 # The ``datasets`` value that means every dataset in ``DATASETS``.
@@ -174,15 +172,15 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     today = today or date.today()
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
-    game_logs = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
-    requests = {name: len(to_fetch) for name, to_fetch in game_logs.items()}
-    requests[CORE] += len(_players_without_bios(store)) + NEW_PLAYERS_PER_SEASON * len(
-        _seasons_without_box_scores(store, game_logs[CORE])
+    requests = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
+    counts = {name: len(to_fetch) for name, to_fetch in requests.items()}
+    counts[CORE] += len(_players_without_bios(store)) + NEW_PLAYERS_PER_SEASON * len(
+        _seasons_without_box_scores(store, requests[CORE])
     )
-    print(_estimate(requests))
+    print(_estimate(counts))
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
-        for name, to_fetch in game_logs.items():
+        for name, to_fetch in requests.items():
             for season, season_type, kind, tables in to_fetch:
                 _fetch_game_log(source, store, report, DATASETS[name], season, season_type, kind, tables)
         _add_new_players(source, store, report)
@@ -215,7 +213,7 @@ def _drop_deleted_datasets(store, selection):
     deleted = [name for name in selection["datasets"] if not store.dataset_root(name).is_dir()]
     if not deleted:
         return selection
-    store.drop_items({table for name in deleted for tables in DATASETS[name].tables.values() for table, _ in tables})
+    store.drop_items({table for name in deleted for table in DATASETS[name].table_names})
     return {**selection, "datasets": [name for name in selection["datasets"] if name not in deleted]}
 
 
@@ -233,7 +231,7 @@ def _dataset_status(store, name, seasons):
     Core also needs a bio for every player in its box scores. ``last_updated`` is when one of its
     items was last fetched.
     """
-    tables = {table for tables in DATASETS[name].tables.values() for table, _ in tables}
+    tables = set(DATASETS[name].table_names)
     complete = not DATASETS[name].to_fetch(store, seasons, latest=None)
     if name == CORE:
         tables.add(PLAYERS)

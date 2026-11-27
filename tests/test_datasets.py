@@ -189,7 +189,7 @@ def test_the_published_file_is_rebuilt_when_the_selection_changes_and_not_otherw
     assert new_dataset != new_season
 
 
-class CountingSource(ReplaySource):
+class GameLogCountingSource(ReplaySource):
     def __init__(self, fixtures_dir):
         super().__init__(fixtures_dir)
         self.game_log_requests = 0
@@ -204,7 +204,7 @@ def test_the_estimate_counts_each_datasets_requests(tmp_path, fake, capsys):
     ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=SUMMER)
     capsys.readouterr()
 
-    source = CountingSource(FIXTURES)
+    source = GameLogCountingSource(FIXTURES)
     ingest(source, store, datasets=["fake"], today=SUMMER)
 
     # 2023-24 is the latest season, so core refetches its 6 game logs. fake has 3 per season, all missing.

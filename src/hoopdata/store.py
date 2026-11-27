@@ -69,15 +69,11 @@ class Store:
         return None
 
     def write_selection(self, selection):
-        manifest = self.read_manifest()
-        manifest["selection"] = selection
-        _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
+        self._write_manifest_key("selection", selection)
 
     def write_datasets(self, datasets):
         """Record each selected dataset's status, a list of ``{"dataset", "last_updated", "complete"}``, for ``hoopdata_datasets``."""
-        manifest = self.read_manifest()
-        manifest["datasets"] = datasets
-        _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
+        self._write_manifest_key("datasets", datasets)
 
     def succeeded_items(self, season):
         """The ``(table, season_type)`` items of ``season`` whose latest fetch succeeded."""
@@ -160,7 +156,12 @@ class Store:
         with duckdb.connect(str(temp)) as con:
             con.execute(sql)
         os.replace(temp, self.database_path)
-        manifest["views_hash"] = views_hash
+        self._write_manifest_key("views_hash", views_hash)
+
+    def _write_manifest_key(self, key, value):
+        """Set one top-level key of the manifest, keeping the rest."""
+        manifest = self.read_manifest()
+        manifest[key] = value
         _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
 
 

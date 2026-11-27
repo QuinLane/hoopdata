@@ -34,7 +34,11 @@ def main(argv=None, source=None):
     args = parser.parse_args(argv)
 
     data_root = args.data_root or os.environ.get("NBA_DATA_ROOT") or DEFAULT_DATA_ROOT
-    seasons = [args.season] if args.season else ALL_SEASONS if args.all_seasons else None
+    seasons = None
+    if args.season:
+        seasons = [args.season]
+    elif args.all_seasons:
+        seasons = ALL_SEASONS
     datasets = args.datasets.split(",") if args.datasets else None
     try:
         report = ingest(source or NbaApiSource(), Store(data_root), seasons=seasons, datasets=datasets)
