@@ -233,6 +233,28 @@ def test_every_fixture_game_reconciles_with_its_box_scores_on_every_stat(both_se
     )
 
 
+def test_the_fixtures_hold_every_action_the_counting_rules_treat_specially(both_seasons):
+    def count(where):
+        return both_seasons.execute(f"select count(*) from play_by_play where {where}").fetchone()[0]
+
+    assert count("action_type = 'Foul' and sub_type = 'Technical'") > 0
+    assert count("action_type = 'Rebound' and person_id is null") > 0
+    assert count("action_type = 'Turnover' and person_id is null") > 0
+    assert count("description like '%STEAL%'") > 0
+    assert count("description like '%BLOCK%'") > 0
+
+
+def test_the_2019_20_bubble_game_is_stored_as_play_in_and_reconciles(tmp_path):
+    # Only the bubble game has 2019-20 core fixtures, so the regular season and playoff items fail.
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2019-20"], datasets=["pbp"], today=SUMMER)
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        rows = con.execute("select * from pbp_reconciliation_seasons").fetchall()
+
+    assert (tmp_path / "pbp" / "play_by_play" / "season=2019-20" / "playin" / "0051900111.parquet").exists()
+    assert rows == [("2019-20", "PlayIn", 1, 1, 1.0)]
+
+
 class DroppedShotSource(ReplaySource):
     """Replay source whose opener play-by-play is missing Jokic's opening layup (action 9, a made 2)."""
 
