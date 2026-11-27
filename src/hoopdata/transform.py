@@ -151,7 +151,9 @@ def shots(raws, season, season_type):
 
 
 def official_rosters(raws, season, season_type):
-    """Every player on the teams' rosters ``raws``, the kept columns as given. ``season_type`` is always ``None``."""
+    """Every player on the teams' official rosters ``raws``, the kept columns as given. ``season_type`` is always
+    ``None``.
+    """
     df = pd.concat([_result_set(raw) for raw in raws], ignore_index=True).rename(columns=OFFICIAL_ROSTER_COLUMNS)
     df["season"] = season
     return df[list(OFFICIAL_ROSTER_TYPES)].astype(OFFICIAL_ROSTER_TYPES)

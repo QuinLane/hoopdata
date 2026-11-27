@@ -47,7 +47,7 @@ NEW_PLAYERS_PER_SEASON = 90
 # each season and season type (30 seasons, regular season and playoffs, Play-In from 2019-20).
 # Shots: one shot chart per team per season and season type, ~1,400 requests (30 teams in a regular season, 16 in
 # the playoffs, 8 in the Play-In).
-# Rosters: one team roster per team per season, ~930 requests (31 seasons of about 30 teams).
+# Rosters: one official roster per team per season, ~930 requests (31 seasons of about 30 teams).
 FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400, ROSTERS: 930}
 
 log = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ DATASETS = {
     ROSTERS: Dataset(
         ROSTERS,
         {TEAM: [(OFFICIAL_ROSTERS, transform.official_rosters), (COACH_SEASONS, transform.coach_seasons)]},
-        lambda source, store, season, season_type, kind: _fetch_team_rosters(source, store, season),
+        lambda source, store, season, season_type, kind: _fetch_official_rosters(source, store, season),
         files("hoopdata").joinpath("rosters_views.sql").read_text(encoding="utf-8"),
         requests_per_item={None: 30},
     ),
@@ -170,13 +170,13 @@ def _fetch_shot_charts(source, store, season, season_type):
     return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
 
 
-def _fetch_team_rosters(source, store, season):
-    """Each team's roster, for every team in core's team box scores of ``season``, any season type."""
+def _fetch_official_rosters(source, store, season):
+    """Each team's official roster, for every team in core's team box scores of ``season``, any season type."""
     partitions = [store.read_partition(TEAM_BOX_SCORES, season, season_type) for season_type in _season_types(season)]
     team_ids = sorted({team_id for df in partitions if df is not None for team_id in df["team_id"]})
     if not team_ids:
         raise MissingCoreError(f"core holds no games for {season} yet")
-    return [source.team_roster(season, team_id) for team_id in team_ids]
+    return [source.official_roster(season, team_id) for team_id in team_ids]
 
 
 class EmptySelectionError(Exception):

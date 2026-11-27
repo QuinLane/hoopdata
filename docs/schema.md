@@ -212,15 +212,15 @@ One row per season, team and player on the team's official roster, as NBA last r
 | `season` | VARCHAR | Season, like `2023-24` |
 | `team_id` | BIGINT | NBA team ID |
 | `player_id` | BIGINT | NBA player ID |
-| `player_name` | VARCHAR | Player's name as listed on the roster |
+| `player_name` | VARCHAR | Player's name as listed on the official roster |
 | `jersey_number` | VARCHAR | Jersey number as given, so `0` and `00` stay different |
 | `position` | VARCHAR | Position as given, like `G` or `F-C` |
 | `experience` | VARCHAR | Seasons of NBA experience as given, `R` for a rookie |
 | `how_acquired` | VARCHAR | How the team got the player as given, like `#21 Pick in 2022 Draft`; often `NULL`, always in early seasons |
 
-**What the snapshot leaves out.** The roster is one snapshot, stored as given and not repaired:
+**What the snapshot leaves out.** The official roster is one snapshot, stored as given and not repaired:
 - Players gone before NBA's last report are missing. SEA 1996-97 lists 12 players where core has 16 who appeared: Craig Ehlo (62 games) isn't there. OKC 2024-25 misses Alex Reese and Malevy Leons.
-- A new season's rosters arrive only after its first game, since the teams come from core.
+- A new season's official rosters arrive only after its first game, since the teams come from core.
 
 Not stored from the source: `LeagueID`, the source `SEASON` (the start year), `NICKNAME`, `PLAYER_SLUG`, `SUPPLEMENTAL_STATUS` and the bio columns `HEIGHT`, `WEIGHT`, `BIRTH_DATE`, `AGE` and `SCHOOL` (bios live in `players`), and the second result set, the team's staff (its coaches are stored in `coach_seasons`).
 
