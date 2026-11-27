@@ -8,7 +8,7 @@ import pandas as pd
 from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
-from hoopdata.source import PLAYER, SEASON_TYPES, TEAM
+from hoopdata.source import PLAY_IN, PLAYER, SEASON_TYPES, TEAM
 from hoopdata.store import FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
@@ -18,6 +18,9 @@ PLAYERS = "players"
 TEAMS = "teams"
 
 FIRST_SEASON_START_YEAR = 1996
+
+# Play-In games only exist from this season on, so earlier seasons never get a Play-In item.
+FIRST_PLAY_IN_SEASON = "2019-20"
 
 # Bios are written to players.parquet after every this many players.
 BIOS_PER_WRITE = 20
@@ -104,15 +107,21 @@ def _game_logs_to_fetch(store, season, refetch_complete):
     ``tables`` lists only the ``(table, transform)`` pairs to write. A season with every item
     succeeded is fetched in full if ``refetch_complete``, otherwise skipped.
     """
-    all_items = {(table, season_type) for season_type in SEASON_TYPES for tables in TABLES.values() for table, _ in tables}
+    season_types = _season_types(season)
+    all_items = {(table, season_type) for season_type in season_types for tables in TABLES.values() for table, _ in tables}
     to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
     game_logs = []
-    for season_type in SEASON_TYPES:
+    for season_type in season_types:
         for kind, tables in TABLES.items():
             tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
             if tables:
                 game_logs.append((season_type, kind, tables))
     return game_logs
+
+
+def _season_types(season):
+    """The season types ``season`` has: Play-In only from 2019-20 on."""
+    return [t for t in SEASON_TYPES if t != PLAY_IN or season >= FIRST_PLAY_IN_SEASON]
 
 
 def _fetch_game_log(source, store, report, season, season_type, kind, tables):
