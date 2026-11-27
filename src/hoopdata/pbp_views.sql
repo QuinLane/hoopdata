@@ -56,8 +56,9 @@ select
     coalesce(pbp.blk, 0) as pbp_blk, box.blk as box_blk,
     coalesce(pbp.tov, 0) as pbp_tov, box.tov as box_tov,
     coalesce(pbp.pf, 0) as pbp_pf, box.pf as box_pf,
+    -- A NULL box stat is a mismatch, not NULL.
     (pbp_pts, pbp_fgm, pbp_fga, pbp_fg3m, pbp_fg3a, pbp_ftm, pbp_fta, pbp_reb, pbp_ast, pbp_stl, pbp_blk, pbp_tov, pbp_pf)
-        = (box_pts, box_fgm, box_fga, box_fg3m, box_fg3a, box_ftm, box_fta, box_reb, box_ast, box_stl, box_blk, box_tov, box_pf)
+        is not distinct from (box_pts, box_fgm, box_fga, box_fg3m, box_fg3a, box_ftm, box_fta, box_reb, box_ast, box_stl, box_blk, box_tov, box_pf)
         as matches
 from team_box_scores as box
 left join pbp_sums as pbp using (game_id, team_id)

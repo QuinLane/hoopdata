@@ -302,6 +302,31 @@ def test_a_dropped_made_shot_shows_as_a_mismatch_in_pts_fgm_and_fga_without_fail
     assert dict(zip(STATS, denver)) == {stat: 0 for stat in STATS} | {"pts": -2, "fgm": -1, "fga": -1}
 
 
+class MissingBoxStatSource(ReplaySource):
+    """Replay source whose team game log gives Denver's opener no PF."""
+
+    def game_log(self, season, season_type, kind):
+        response = super().game_log(season, season_type, kind)
+        result = response["resultSets"][0]
+        if kind == "team":
+            columns = result["headers"]
+            for row in result["rowSet"]:
+                if row[columns.index("GAME_ID")] == OPENER and row[columns.index("TEAM_ID")] == NUGGETS:
+                    row[columns.index("PF")] = None
+        return response
+
+
+def test_a_missing_box_score_stat_is_a_mismatch_not_null(tmp_path):
+    ingest(MissingBoxStatSource(FIXTURES), Store(tmp_path), seasons=["2023-24"], datasets=["pbp"], today=SUMMER)
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        matches = con.execute(
+            "select matches from pbp_reconciliation where game_id = ? and team_id = ?", [OPENER, NUGGETS]
+        ).fetchone()[0]
+
+    assert matches is False
+
+
 def test_the_season_rollup_counts_games_and_games_where_both_teams_match(tmp_path):
     ingest(DroppedShotSource(FIXTURES), Store(tmp_path), seasons=["2022-23", "2023-24"], datasets=["pbp"], today=SUMMER)
 

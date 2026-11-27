@@ -455,7 +455,7 @@ Whether a game's play-by-play adds up to its box scores: one row per game held i
 | `team_id` | BIGINT | NBA team ID |
 | `pbp_<stat>` | BIGINT | The stat summed from the team's actions, `0` when it has none |
 | `box_<stat>` | BIGINT | The same stat in `team_box_scores` |
-| `matches` | BOOLEAN | Every `pbp_<stat>` equals its `box_<stat>` |
+| `matches` | BOOLEAN | Every `pbp_<stat>` equals its `box_<stat>`; false, not `NULL`, when a `box_<stat>` is `NULL` |
 
 `<stat>` is each of `pts`, `fgm`, `fga`, `fg3m`, `fg3a`, `ftm`, `fta`, `reb`, `ast`, `stl`, `blk`, `tov` and `pf`, counted from the team's actions (`team_id`) like this:
 
