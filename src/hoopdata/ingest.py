@@ -170,7 +170,9 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
                 _fetch_game_log(source, store, report, DATASETS[name], season, season_type, kind, tables)
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
-        store.publish([DATASETS[name].views for name in selection["datasets"]])
+        store.write_datasets([_dataset_status(store, name, selected) for name in selection["datasets"]])
+        # A dataset's views are published once it has any data, so a partly backfilled one shows up straight away.
+        store.publish([DATASETS[name].views for name in selection["datasets"] if store.has_data(name)])
     return report
 
 
@@ -204,6 +206,21 @@ def _add_datasets(selection, datasets):
         return selection
     names = set(selection["datasets"]) | set(datasets)
     return {**selection, "datasets": sorted(names, key=lambda name: (name != CORE, name))}
+
+
+def _dataset_status(store, name, seasons):
+    """``name``'s row in ``hoopdata_datasets``: complete once every item in ``seasons`` has succeeded.
+
+    Core also needs a bio for every player in its box scores. ``last_updated`` is when one of its
+    items was last fetched.
+    """
+    tables = {table for tables in DATASETS[name].tables.values() for table, _ in tables}
+    complete = not DATASETS[name].to_fetch(store, seasons, latest=None)
+    if name == CORE:
+        tables.add(PLAYERS)
+        complete = complete and not _players_without_bios(store)
+    fetched = [i["fetched_at"] for i in store.read_manifest()["items"] if i["table"] in tables]
+    return {"dataset": name, "last_updated": max(fetched, default=None), "complete": complete}
 
 
 def _estimate(requests):

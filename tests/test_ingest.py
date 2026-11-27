@@ -378,6 +378,19 @@ def test_a_failed_bio_is_recorded_and_the_run_still_publishes(tmp_path):
     assert teams == 30
 
 
+def test_core_is_incomplete_while_a_bio_has_failed(tmp_path):
+    store = Store(tmp_path)
+    ingest(FailingBioSource(FIXTURES, failing_player_ids=[JOKIC]), store, seasons=["2023-24"], today=date(2024, 7, 1))
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        failed = con.execute("select complete from hoopdata_datasets").fetchall()
+
+    ingest(ReplaySource(FIXTURES), store, today=date(2024, 7, 1))
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        assert con.execute("select complete from hoopdata_datasets").fetchall() == [(True,)]
+    assert failed == [(False,)]
+
+
 def test_a_failed_bio_is_fetched_on_the_next_run(tmp_path):
     store = Store(tmp_path)
     ingest(FailingBioSource(FIXTURES, failing_player_ids=[JOKIC]), store, seasons=["2023-24"])
@@ -484,6 +497,22 @@ def test_hoopdata_info_reports_the_manifest_schema_version_and_last_updated(db, 
 
     assert schema_version == 1
     assert last_updated == datetime.fromisoformat(manifest["last_updated"])
+
+
+def test_hoopdata_info_seasons_is_the_fixed_list_held(tmp_path):
+    store = Store(tmp_path)
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"], today=date(2024, 7, 1))
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        assert con.execute("select seasons from hoopdata_info").fetchone()[0] == "2022-23, 2023-24"
+
+
+def test_hoopdata_info_seasons_is_all_when_every_season_is_held(tmp_path):
+    ingest(BackfillSource(FIXTURES), Store(tmp_path), seasons=ALL_SEASONS, today=date(2024, 7, 1))
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        assert con.execute("select seasons from hoopdata_info").fetchone()[0] == "all"
 
 
 def test_later_ingest_updates_hoopdata_info_without_rebuilding_the_file(tmp_path):

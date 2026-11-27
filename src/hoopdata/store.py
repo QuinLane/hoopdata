@@ -39,6 +39,10 @@ class Store:
         """Where ``dataset``'s tables live: the data root for core, its own top-level folder for the others."""
         return self.root if dataset == CORE else self.root / dataset
 
+    def has_data(self, dataset):
+        """Whether ``dataset`` has any Parquet files yet. DuckDB can't create a view over none."""
+        return any(self.dataset_root(dataset).rglob("*.parquet"))
+
     def new_log_path(self):
         """A fresh log file path for one run, named by its start time."""
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -67,6 +71,12 @@ class Store:
     def write_selection(self, selection):
         manifest = self.read_manifest()
         manifest["selection"] = selection
+        _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
+
+    def write_datasets(self, datasets):
+        """Record each selected dataset's status, a list of ``{"dataset", "last_updated", "complete"}``, for ``hoopdata_datasets``."""
+        manifest = self.read_manifest()
+        manifest["datasets"] = datasets
         _write_atomically(self.manifest_path, json.dumps(manifest, indent=2))
 
     def succeeded_items(self, season):

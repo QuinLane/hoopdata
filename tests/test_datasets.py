@@ -1,6 +1,6 @@
 import json
 import shutil
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import duckdb
@@ -198,3 +198,57 @@ def test_the_estimate_counts_each_datasets_requests(tmp_path, fake, capsys):
     assert "About 12 requests, roughly 12 s (core: 6 · fake: 6)" in capsys.readouterr().out
     assert source.game_log_requests == 6
     assert len(fake.requests_made) == 6
+
+
+def query(data_root, sql):
+    with duckdb.connect(str(Path(data_root) / "hoopdata.duckdb"), read_only=True) as con:
+        return con.execute(sql).fetchall()
+
+
+def test_hoopdata_datasets_lists_core_and_every_selected_dataset(tmp_path, fake):
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2023-24"], datasets=["fake"], today=SUMMER)
+
+    assert query(tmp_path, "select dataset from hoopdata_datasets order by dataset") == [("core",), ("fake",)]
+
+
+def test_hoopdata_datasets_leaves_out_datasets_not_selected(tmp_path, fake):
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2023-24"], today=SUMMER)
+
+    assert query(tmp_path, "select dataset from hoopdata_datasets") == [("core",)]
+
+
+class FailingFakeDataset(FakeDataset):
+    def _fetch(self, source, season, season_type, kind):
+        raise ConnectionError("timed out")
+
+
+def test_a_dataset_is_incomplete_while_an_item_has_failed_and_complete_once_all_succeed(tmp_path, monkeypatch, fake):
+    store = Store(tmp_path)
+    monkeypatch.setitem(DATASETS, "fake", FailingFakeDataset())
+    ingest(ReplaySource(FIXTURES), store, seasons=["2023-24"], datasets=["fake"], today=SUMMER)
+    failed = query(tmp_path, "select dataset, complete from hoopdata_datasets order by dataset")
+    monkeypatch.setitem(DATASETS, "fake", fake)
+
+    ingest(ReplaySource(FIXTURES), store, today=SUMMER)
+
+    assert failed == [("core", True), ("fake", False)]
+    assert query(tmp_path, "select dataset, complete from hoopdata_datasets order by dataset") == [
+        ("core", True), ("fake", True),
+    ]
+
+
+def test_last_updated_is_when_each_dataset_last_fetched_an_item(tmp_path, fake):
+    store = Store(tmp_path)
+    # 2022-23 isn't the latest season, so once it's complete core fetches nothing more.
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=SUMMER)
+    core_fetched = max(datetime.fromisoformat(i["fetched_at"]) for i in manifest(tmp_path)["items"])
+
+    ingest(ReplaySource(FIXTURES), store, datasets=["fake"], today=SUMMER)
+
+    fake_fetched = max(
+        datetime.fromisoformat(i["fetched_at"]) for i in manifest(tmp_path)["items"] if i["table"] == "fake_scores"
+    )
+    assert query(tmp_path, "select dataset, last_updated from hoopdata_datasets order by dataset") == [
+        ("core", core_fetched), ("fake", fake_fetched),
+    ]
+    assert fake_fetched > core_fetched

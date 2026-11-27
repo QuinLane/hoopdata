@@ -191,9 +191,24 @@ One row describing the data. It reads `manifest.json` at query time, so it shows
 |---|---|---|
 | `schema_version` | INTEGER | Version of this schema (see below) |
 | `last_updated` | TIMESTAMP WITH TIME ZONE | When an item was last recorded in the manifest |
+| `seasons` | VARCHAR | The seasons the data root holds: `all` (every season, including future ones), or the fixed list, like `2022-23, 2023-24` |
 
 ```sql
-select schema_version, last_updated from hoopdata_info
+select schema_version, last_updated, seasons from hoopdata_info
+```
+
+### `hoopdata_datasets`
+
+One row per dataset in the data root's selection, core included. Like `hoopdata_info`, it reads `manifest.json` at query time. It is written at the end of every ingest. A selected dataset's own views are published once it has any data.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `dataset` | VARCHAR | Dataset name, like `core` |
+| `last_updated` | TIMESTAMP WITH TIME ZONE | When one of the dataset's items was last fetched |
+| `complete` | BOOLEAN | Every item in the selection has succeeded: every selected season (with `all`, every season through the latest) and season type, and for core a bio for every player |
+
+```sql
+select dataset, last_updated, complete from hoopdata_datasets
 ```
 
 ## Manifest
@@ -215,6 +230,9 @@ select schema_version, last_updated from hoopdata_info
       "error": null
     }
   ],
+  "datasets": [
+    {"dataset": "core", "last_updated": "2026-11-26T11:00:00.123456+00:00", "complete": true}
+  ],
   "views_hash": "..."
 }
 ```
@@ -223,6 +241,7 @@ select schema_version, last_updated from hoopdata_info
 - **`last_updated`**: UTC time the latest item was recorded.
 - **`items`**: one entry per table, season and season type (no `PlayIn` items before 2019-20), holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
 - **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
+- **`datasets`**: each selected dataset's status as of the latest run, read by `hoopdata_datasets`.
 - **`views_hash`**: internal. A fingerprint of the published views, used to decide when `hoopdata.duckdb` must be rebuilt.
 
 ## When `hoopdata.duckdb` is rebuilt
