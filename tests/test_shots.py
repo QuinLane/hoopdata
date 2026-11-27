@@ -163,6 +163,25 @@ def test_a_shots_item_whose_core_season_isnt_held_fails_without_requests_and_suc
     assert games == 1
 
 
+class EmptyCorePlayoffsSource(FailingLakersSource):
+    """Replay source whose 2022-23 playoffs game logs come back with no games, as before the playoffs start."""
+
+    def game_log(self, season, season_type, kind):
+        response = super().game_log(season, season_type, kind)
+        if (season, season_type) == ("2022-23", "Playoffs"):
+            response["resultSets"][0]["rowSet"] = []
+        return response
+
+
+def test_a_shots_item_whose_core_season_type_holds_no_games_fails_without_requests(tmp_path):
+    source = EmptyCorePlayoffsSource(FIXTURES, failing=False)
+    report = ingest(source, Store(tmp_path), seasons=["2022-23"], datasets=["shots"], today=SUMMER)
+
+    assert [item.name for item in report.failed] == ["shots 2022-23 Playoffs"]
+    assert "core holds no team box scores for 2022-23 Playoffs" in report.failed[0].error
+    assert [request for request in source.shot_chart_requests if request[1] == "Playoffs"] == []
+
+
 def test_the_estimate_counts_30_16_and_8_requests_per_regular_season_playoffs_and_play_in_shots_item(
     tmp_path, capsys
 ):

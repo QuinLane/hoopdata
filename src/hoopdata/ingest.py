@@ -9,7 +9,7 @@ import pandas as pd
 from nba_api.stats.static import teams as static_teams
 
 from hoopdata import transform
-from hoopdata.source import PLAY_IN, PLAYER, PLAYOFFS, REGULAR_SEASON, SEASON_TYPES, TEAM
+from hoopdata.source import GAME, PLAY_IN, PLAYER, PLAYOFFS, REGULAR_SEASON, SEASON_TYPES, TEAM
 from hoopdata.store import ALL_SEASONS, CORE, FAILED, SUCCEEDED
 
 PLAYER_BOX_SCORES = "player_box_scores"
@@ -22,9 +22,11 @@ TEAM_ADVANCED_BOX_SCORES = "team_advanced_box_scores"
 SHOTS = "shots"
 OFFICIAL_ROSTERS = "official_rosters"
 COACH_SEASONS = "coach_seasons"
+PLAY_BY_PLAY = "play_by_play"
 
 ADVANCED = "advanced"
 ROSTERS = "rosters"
+PBP = "pbp"
 
 FIRST_SEASON_START_YEAR = 1996
 
@@ -48,7 +50,9 @@ NEW_PLAYERS_PER_SEASON = 90
 # Shots: one shot chart per team per season and season type, ~1,400 requests (30 teams in a regular season, 16 in
 # the playoffs, 8 in the Play-In).
 # Rosters: one official roster per team per season, ~930 requests (31 seasons of about 30 teams).
-FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400, ROSTERS: 930}
+# Pbp: one request per game, ~38,000 requests (about 1,230 games a season since 1996-97, plus the playoffs and
+# Play-In).
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400, ROSTERS: 930, PBP: 38_000}
 
 log = logging.getLogger(__name__)
 
@@ -67,17 +71,21 @@ class Dataset:
     maps each kind to the ``(table, transform)`` pairs its response feeds, ``fetch`` gets the
     response as ``fetch(source, store, season, season_type, kind)``, and ``views`` is the SQL that
     publishes its views, with ``{root}`` standing for the data root. A fetch can make several
-    requests, reading what to ask for from ``store``. ``requests_per_item`` names the season types
-    the dataset has and the requests each of their fetches makes; ``None`` means every season type
-    at one request. A ``None`` season type in it makes the items season-only: one per table and
-    season, fetched with ``season_type`` ``None``.
+    requests, reading what to ask for from ``store``. A ``None`` transform means the fetch writes
+    that table itself, as it goes, and returns its row count. Such a fetch can skip what's already
+    held, so refetching the latest season only fetches what's new (play-by-play, ADR 0003).
+
+    ``season_types`` are the season types the dataset has items for. ``(None,)`` makes the items
+    season-only: one per table and season, fetched with ``season_type`` ``None``.
+    ``requests(store, season, season_type)`` is how many requests one fetch makes, for the estimate.
     """
 
     name: str
     tables: dict
     fetch: object
     views: str
-    requests_per_item: dict | None = None
+    season_types: tuple = tuple(SEASON_TYPES)
+    requests: object = lambda store, season, season_type: 1
 
     @property
     def table_names(self):
@@ -98,18 +106,13 @@ class Dataset:
             for season_type, kind, tables in self._fetches(store, season, season == latest)
         ]
 
-    def request_count(self, to_fetch):
+    def request_count(self, store, to_fetch):
         """How many requests fetching ``to_fetch``, from ``to_fetch()``, makes."""
-        if self.requests_per_item is None:
-            return len(to_fetch)
-        return sum(self.requests_per_item[season_type] for _, season_type, _, _ in to_fetch)
+        return sum(self.requests(store, season, season_type) for season, season_type, _, _ in to_fetch)
 
     def _fetches(self, store, season, refetch_complete):
         """``season``'s fetches with failed or missing items, as ``(season_type, kind, tables)``."""
-        if self.requests_per_item is None:
-            season_types = _season_types(season)
-        else:
-            season_types = [t for t in [*_season_types(season), None] if t in self.requests_per_item]
+        season_types = [t for t in [*_season_types(season), None] if t in self.season_types]
         all_items = {(table, season_type) for season_type in season_types for table in self.table_names}
         to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
         fetches = []
@@ -146,14 +149,24 @@ DATASETS = {
         {TEAM: [(SHOTS, transform.shots)]},
         lambda source, store, season, season_type, kind: _fetch_shot_charts(source, store, season, season_type),
         files("hoopdata").joinpath("shots_views.sql").read_text(encoding="utf-8"),
-        requests_per_item={REGULAR_SEASON: 30, PLAY_IN: 8, PLAYOFFS: 16},
+        requests=lambda store, season, season_type: {REGULAR_SEASON: 30, PLAY_IN: 8, PLAYOFFS: 16}[season_type],
     ),
     ROSTERS: Dataset(
         ROSTERS,
         {TEAM: [(OFFICIAL_ROSTERS, transform.official_rosters), (COACH_SEASONS, transform.coach_seasons)]},
         lambda source, store, season, season_type, kind: _fetch_official_rosters(source, store, season),
         files("hoopdata").joinpath("rosters_views.sql").read_text(encoding="utf-8"),
-        requests_per_item={None: 30},
+        season_types=(None,),
+        requests=lambda store, season, season_type: 30,
+    ),
+    PBP: Dataset(
+        PBP,
+        {GAME: [(PLAY_BY_PLAY, None)]},
+        lambda source, store, season, season_type, kind: _fetch_play_by_play(source, store, season, season_type),
+        files("hoopdata").joinpath("pbp_views.sql").read_text(encoding="utf-8"),
+        requests=lambda store, season, season_type: len(_games_without_play_by_play(
+            store, season, season_type, store.read_partition(TEAM_BOX_SCORES, season, season_type)
+        )),
     ),
 }
 
@@ -164,10 +177,16 @@ class MissingCoreError(Exception):
 
 def _fetch_shot_charts(source, store, season, season_type):
     """Each team's shot chart, for every team in core's team box scores of ``season`` and ``season_type``."""
-    team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
-    if team_box_scores is None:
-        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
+    team_box_scores = _core_team_box_scores(store, season, season_type)
     return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
+
+
+def _core_team_box_scores(store, season, season_type):
+    """Core's team box scores of ``season`` and ``season_type``, raising ``MissingCoreError`` if it holds none."""
+    team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
+    if team_box_scores is None or team_box_scores.empty:
+        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
+    return team_box_scores
 
 
 def _fetch_official_rosters(source, store, season):
@@ -177,6 +196,41 @@ def _fetch_official_rosters(source, store, season):
     if not team_ids:
         raise MissingCoreError(f"core holds no games for {season} yet")
     return [source.official_roster(season, team_id) for team_id in team_ids]
+
+
+class FailedGamesError(Exception):
+    """Some of a play-by-play item's games failed. The games fetched are kept, and the next run fetches the rest."""
+
+
+def _fetch_play_by_play(source, store, season, season_type):
+    """Fetch and write each game's play-by-play that isn't held yet, returning the rows written.
+
+    The games are those in core's team box scores of ``season`` and ``season_type``. Each game is
+    written as soon as it's fetched, and a held game is never fetched again (ADR 0003). A failed
+    game is logged and the rest are still fetched, then the item fails. If core holds no games for
+    them, the item fails without any requests.
+    """
+    team_box_scores = _core_team_box_scores(store, season, season_type)
+    game_ids = _games_without_play_by_play(store, season, season_type, team_box_scores)
+    rows, errors = 0, []
+    for game_id in game_ids:
+        try:
+            df = transform.play_by_play(source.play_by_play(game_id))
+            store.write_game(PLAY_BY_PLAY, season, season_type, game_id, df, dataset=PBP)
+            rows += len(df)
+        except Exception as e:
+            errors.append(e)
+            log.error("play-by-play for game %s failed", game_id, exc_info=e)
+    if errors:
+        raise FailedGamesError(f"{len(errors)} of {len(game_ids)} games failed, first: {_describe(errors[0])}")
+    return rows
+
+
+def _games_without_play_by_play(store, season, season_type, team_box_scores):
+    """The games in ``team_box_scores``, core's for ``season`` and ``season_type`` or ``None``, with no play-by-play
+    held yet, sorted."""
+    games = set(team_box_scores["game_id"]) if team_box_scores is not None else set()
+    return sorted(games - store.held_games(PLAY_BY_PLAY, season, season_type, dataset=PBP))
 
 
 class EmptySelectionError(Exception):
@@ -248,7 +302,7 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
     fetches = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
-    counts = {name: DATASETS[name].request_count(to_fetch) for name, to_fetch in fetches.items()}
+    counts = {name: DATASETS[name].request_count(store, to_fetch) for name, to_fetch in fetches.items()}
     counts[CORE] += len(_players_without_bios(store)) + NEW_PLAYERS_PER_SEASON * len(
         _seasons_without_box_scores(store, fetches[CORE])
     )
@@ -375,6 +429,10 @@ def _fetch_and_write(source, store, report, dataset, season, season_type, kind, 
             _fail(store, report, table, season, season_type, e)
         return
     for table, to_table in tables:
+        if to_table is None:
+            # The fetch wrote this table itself and returned its row count.
+            _record(store, report, Item(table, season, season_type, SUCCEEDED, rows=raw))
+            continue
         try:
             df = to_table(raw, season, season_type)
             store.write_partition(table, season, season_type, df, dataset=dataset.name)

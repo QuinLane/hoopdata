@@ -87,6 +87,30 @@ COACH_SEASON_TYPES = {
     **dict.fromkeys(["first_name", "last_name", "coach_name", "coach_type"], "string"),
 }
 
+# One row per play-by-play action, with each kept column's type. The source's camelCase names become snake_case.
+PLAY_BY_PLAY_TYPES = {
+    "game_id": "string",
+    **dict.fromkeys(["action_id", "action_number", "period"], "Int64"),
+    "clock": "string",
+    **dict.fromkeys(["team_id", "person_id"], "Int64"),
+    **dict.fromkeys(["action_type", "sub_type", "description"], "string"),
+    **dict.fromkeys(["is_field_goal", "shot_value"], "Int64"),
+    "shot_result": "string",
+    **dict.fromkeys(["shot_distance", "x_legacy", "y_legacy"], "Int64"),
+    "location": "string",
+    **dict.fromkeys(["score_home", "score_away"], "Int32"),
+    "points_total": "Int64",
+}
+
+# Team IDs all start with these digits, like 1610612743. No player ID does.
+TEAM_ID_PREFIX = 1610612
+
+
+def is_team_id(ids):
+    """Whether each of ``ids`` is a team ID rather than a player ID."""
+    return ids // 10**3 == TEAM_ID_PREFIX
+
+
 PLAYER_COLUMNS = [
     "player_id", "first_name", "last_name", "display_name", "birthdate",
     "height_in", "weight_lb", "position", "country", "school",
@@ -170,6 +194,22 @@ def coach_seasons(raws, season, season_type):
     df = df[df["coach_type"].str.contains("Head Coach|Assistant Coach", na=False)].copy()
     df["season"] = season
     return df[list(COACH_SEASON_TYPES)].astype(COACH_SEASON_TYPES)
+
+
+def play_by_play(raw):
+    """One game's actions, the kept columns as given and ordered by ``action_id``. Blank scores are NULL.
+
+    Team-level actions (team rebounds, timeouts, team turnovers) come with the team ID in
+    ``personId`` and 0 in ``teamId``. They're stored with it in ``team_id`` and ``person_id`` NULL.
+    """
+    df = pd.DataFrame(raw["game"]["actions"])
+    df.columns = df.columns.str.replace(r"([A-Z])", r"_\1", regex=True).str.lower()
+    df["game_id"] = raw["game"]["gameId"]
+    team_level = is_team_id(df["person_id"])
+    df.loc[team_level, "team_id"] = df.loc[team_level, "person_id"]
+    df.loc[team_level, "person_id"] = None
+    df[["score_home", "score_away"]] = df[["score_home", "score_away"]].replace("", None)
+    return df[list(PLAY_BY_PLAY_TYPES)].astype(PLAY_BY_PLAY_TYPES).sort_values("action_id", ignore_index=True)
 
 
 def _box_scores(df, season, season_type, columns):

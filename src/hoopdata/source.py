@@ -1,7 +1,8 @@
 """The only seam to the outside world: fetching raw NBA stats.
 
 Every call returns the raw response dict from stats.nba.com
-(``{"resultSets": [{"name", "headers", "rowSet"}, ...]}``).
+(``{"resultSets": [{"name", "headers", "rowSet"}, ...]}``), except play-by-play, whose actions
+are in ``{"game": {"actions": [...]}}``.
 """
 
 import json
@@ -15,6 +16,7 @@ SEASON_TYPES = [REGULAR_SEASON, PLAY_IN, PLAYOFFS]
 
 PLAYER = "player"
 TEAM = "team"
+GAME = "game"
 
 ALL_PLAYERS_FILE = "all_players.json"
 PLAYER_INFO_FILE = "player_info.json"
@@ -77,6 +79,11 @@ class NbaApiSource:
             lambda: commonteamroster.CommonTeamRoster(team_id=team_id, season=season, timeout=self.timeout)
         )
 
+    def play_by_play(self, game_id):
+        from nba_api.stats.endpoints import playbyplayv3
+
+        return self._request(lambda: playbyplayv3.PlayByPlayV3(game_id=game_id, timeout=self.timeout))
+
     def all_players(self):
         from nba_api.stats.endpoints import commonallplayers
 
@@ -125,6 +132,10 @@ class ReplaySource:
         path = self.fixtures_dir / _official_roster_name(season, team_id)
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def play_by_play(self, game_id):
+        path = self.fixtures_dir / _play_by_play_name(game_id)
+        return json.loads(path.read_text(encoding="utf-8"))
+
     def all_players(self):
         return json.loads((self.fixtures_dir / ALL_PLAYERS_FILE).read_text(encoding="utf-8"))
 
@@ -162,6 +173,12 @@ def record_official_roster(source, fixtures_dir, season, team_id):
     return _save(response, Path(fixtures_dir) / _official_roster_name(season, team_id))
 
 
+def record_play_by_play(source, fixtures_dir, game_id):
+    """Fetch one game's play-by-play with ``source`` and save it as a replay fixture."""
+    response = source.play_by_play(game_id)
+    return _save(response, Path(fixtures_dir) / _play_by_play_name(game_id))
+
+
 def record_all_players(source, fixtures_dir, player_ids):
     """Fetch the all-players list, keep only ``player_ids``, and save it as a replay fixture."""
     response = source.all_players()
@@ -194,6 +211,10 @@ def _advanced_box_scores_name(season, season_type, kind):
 
 def _official_roster_name(season, team_id):
     return f"official_roster_{team_id}_{season}.json"
+
+
+def _play_by_play_name(game_id):
+    return f"play_by_play_{game_id}.json"
 
 
 def _fixture_name(prefix, season, season_type, kind):

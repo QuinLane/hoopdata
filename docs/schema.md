@@ -14,7 +14,7 @@ con.sql("select * from player_season_averages").df()
 - **`season`** is a string like `2023-24`.
 - **`season_type`** is `Regular Season`, `PlayIn` or `Playoffs`. Play-In games exist from 2019-20 on (including the 2019-20 bubble game NBA labels Play-In); earlier seasons have none.
 - **Stored tables hold raw counts only.** Every percentage is calculated in a view. The exception is the `advanced` dataset's tables, which hold NBA's official advanced rates exactly as given, with no rescaling (ADR 0001). Some are fractions and some are percents; each column's scale is documented with its table.
-- **Missing values** are `NULL`; integer columns stay integers.
+- **Missing values** are `NULL`; integer columns stay integers. The exception is the `pbp` dataset's `play_by_play`, stored as NBA gives it apart from one coding fix (spec #31): a missing value is whatever NBA sends, usually `0` or an empty string. Only blank scores and team-level actions' `person_id` are `NULL`; each column's meaning says which.
 
 ## Tables
 
@@ -248,6 +248,46 @@ Only head and assistant coaches are kept: rows whose `COACH_TYPE` contains `Head
 
 Not stored from the source: `IS_ASSISTANT` (a role code that repeats `coach_type`), `SORT_SEQUENCE`, `SUB_SORT_SEQUENCE` and the source `SEASON`.
 
+### `play_by_play` (pbp dataset)
+
+One row per action (one event in a game's play-by-play: a shot, rebound, foul, substitution and so on), as NBA gives it apart from the team-action fix below. Only in a data root whose selection includes `pbp`. Source: stats.nba.com `playbyplayv3` (`game.actions`), one request per game in core's `team_box_scores` for that season and season type. Every season type, Play-In from 2019-20 as in core. Stored as Parquet under `pbp/play_by_play/season=<season>/<season_type>/<game_id>.parquet` (`regular_season`, `playoffs` or `playin`), one file per game, written as soon as the game is fetched.
+
+A game already held is never fetched again, not even in the latest season (ADR 0003), so a later NBA correction to it is missed. To redo a game or a season, delete its file or folder and run `ingest`. An item (season and season type) fetches only the core games it doesn't hold yet. It succeeds once every one of them is held; if a game fails, the item fails, keeps the games it fetched, and the next run fetches only the rest. If core holds no games for the season and season type (before opening night, or its core item failed this run), the item fails without any requests and is retried next run.
+
+Key: `game_id` + `action_id`. Order a game's actions by `action_id`: `action_number` isn't in order and isn't unique (a steal shares it with its turnover).
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `game_id` | VARCHAR | NBA game ID, leading zeros kept |
+| `action_id` | BIGINT | The action's ID within the game: unique, and in order |
+| `action_number` | BIGINT | NBA's event number for the action, not unique; matches `shots.game_event_id` |
+| `period` | BIGINT | Period: 1-4, then 5 on for overtimes |
+| `clock` | VARCHAR | Time left in the period as given, like `PT10M55.00S` |
+| `team_id` | BIGINT | NBA team ID of the action's team, `0` when there is none (like a period start) |
+| `person_id` | BIGINT | NBA player ID, `0` when there is none, `NULL` for a team-level action |
+| `action_type` | VARCHAR | Like `Made Shot`, `Rebound` or `Turnover`; empty for steals and blocks |
+| `sub_type` | VARCHAR | Like `Driving Layup Shot` or `Shot Clock Turnover` |
+| `description` | VARCHAR | NBA's text, like `Jokic 3' Driving Layup (2 PTS)`; assisters and incoming substitutes appear only here, by surname |
+| `is_field_goal` | BIGINT | `1` for a field-goal attempt, else `0` |
+| `shot_value` | BIGINT | `2` or `3` for a field goal; also set on blocks |
+| `shot_result` | VARCHAR | `Made` or `Missed`, empty when not a shot |
+| `shot_distance` | BIGINT | Distance from the basket in feet |
+| `x_legacy` | BIGINT | Court x, as `shots.loc_x` |
+| `y_legacy` | BIGINT | Court y, as `shots.loc_y` |
+| `location` | VARCHAR | `h` home, `v` visitor, empty when neither |
+| `score_home` | INTEGER | Home score after the action, given on scoring actions, period starts and ends and instant replays; `NULL` when blank |
+| `score_away` | INTEGER | Away score, given on the same actions as `score_home`; `NULL` when blank |
+| `points_total` | BIGINT | Both teams' points, given with the scores; `0` when they're blank |
+
+**Team-level actions.** NBA gives team rebounds, timeouts, team turnovers and the like with the team ID in `personId` and `0` in `teamId`. They're stored with the team in `team_id` and `person_id` `NULL`. Other actions with `teamId` 0 (period starts, instant replays with a small non-team `personId`) are stored as given.
+
+**Matching shots.** A shot's action is `shots.game_event_id = play_by_play.action_number` with the same game and `shots.player_id = play_by_play.person_id` (`action_number` alone isn't unique).
+
+**Sparse early shot locations.** Early seasons' shot locations have the same gaps as `shots` (see there): many come back at (0,0), 0 ft. They're stored as given.
+
+Not stored from the source: `teamTricode`, `playerName` and `playerNameI` (core has these), `videoAvailable` and the response's `meta`.
+
 ## Views
 
 ### `player_game_stats`
@@ -403,6 +443,71 @@ Each team's coaches per season: every `coach_seasons` column, plus this. Only pu
 |---|---|---|
 | `team_abbreviation` | VARCHAR | Team abbreviation in the team's latest game of the season in `team_box_scores` |
 
+### `pbp_reconciliation` (pbp dataset)
+
+Whether a game's play-by-play adds up to its box scores: one row per game held in `play_by_play` and team in that game's `team_box_scores`. Only published when `pbp` is in the selection. A mismatch is only reported here: it never fails an item or blocks publishing.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
+| `game_id` | VARCHAR | NBA game ID |
+| `team_id` | BIGINT | NBA team ID |
+| `pbp_<stat>` | BIGINT | The stat summed from the team's actions, `0` when it has none |
+| `box_<stat>` | BIGINT | The same stat in `team_box_scores` |
+| `matches` | BOOLEAN | Every `pbp_<stat>` equals its `box_<stat>`; false, not `NULL`, when a `box_<stat>` is `NULL` |
+
+`<stat>` is each of `pts`, `fgm`, `fga`, `fg3m`, `fg3a`, `ftm`, `fta`, `reb`, `ast`, `stl`, `blk`, `tov` and `pf`, counted from the team's actions (`team_id`) like this:
+
+- **Field goals**: `fga` counts `Made Shot` and `Missed Shot` actions, `fgm` the `Made Shot`s; `fg3a` and `fg3m` the same with `shot_value` 3.
+- **Free throws**: `fta` counts `Free Throw` actions, `ftm` those whose `description` doesn't start with `MISS`.
+- **`pts`**: `shot_value` of each `Made Shot`, plus `ftm`.
+- **`reb`**: `Rebound` actions by a player. Team rebounds (`person_id` NULL) aren't counted, as in the box score.
+- **`ast`**: `Made Shot` actions whose `description` ends with `AST)`, like `(Jokic 1 AST)`, as in `assists`.
+- **`stl`** and **`blk`**: actions whose `description` holds `STEAL` or `BLOCK` (their `action_type` is empty).
+- **`tov`**: `Turnover` actions, team turnovers included.
+- **`pf`**: `Foul` actions except technicals: `sub_type` `Technical`, `Double Technical`, `Defense 3 Second` and `Flopping` (a non-unsportsmanlike technical) aren't counted. Flagrant, take and away-from-play fouls are. Pinned against the fixture games, where it matches every team; counting every `Foul` overcounts by the technicals. Coaches' technicals have `team_id` 0, so they're never a team's.
+
+### `pbp_reconciliation_seasons` (pbp dataset)
+
+How much of each season's play-by-play reconciles, as a guide to which eras to trust: one row per season and season type in `pbp_reconciliation`. Only published when `pbp` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `season_type` | VARCHAR | `Regular Season`, `PlayIn` or `Playoffs` |
+| `games` | BIGINT | Games held in `play_by_play` |
+| `matching_games` | BIGINT | Games where both teams' `matches` is true |
+| `matching_share` | DOUBLE | `matching_games / games` |
+
+### `assists` (pbp dataset)
+
+One row per assisted made shot: a `Made Shot` action whose `description` ends with the assister, like `(White 1 AST)`. Only published when `pbp` is in the selection.
+
+**Matching assisters.** Play-by-play has no assister ID, only the surname in the description (with any suffix, like `Porter Jr.`, and without accents). It's matched to the scorer's teammates in that game's `player_box_scores`: a teammate matches when their `player_name`, with accents removed, ends in that surname (`Doncic` matches `Luka Dončić`). When exactly one teammate matches, they're the assister. When none or more than one does (two teammates share the surname, or the game's box scores are missing the player), `assist_player_id` is `NULL` and the parsed name is kept.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season`, `season_type` | VARCHAR | The game's season and season type, from `team_box_scores`, which holds every game in `play_by_play` |
+| `game_id`, `action_id` | | Key, as in `play_by_play` |
+| `period` | BIGINT | Period, as in `play_by_play` |
+| `clock` | VARCHAR | Time left in the period, as in `play_by_play` |
+| `team_id` | BIGINT | The scorer's team |
+| `player_id` | BIGINT | The scorer (`play_by_play.person_id`) |
+| `assist_player_id` | BIGINT | The assister's NBA player ID; `NULL` when no single teammate matches |
+| `assist_player_name` | VARCHAR | The assister as the description gives them, like `Murray` |
+| `shot_value` | BIGINT | `2` or `3` |
+
+### `assist_pairs` (pbp dataset)
+
+Assist totals per assister and scorer: one row per season, season type, team, assister and scorer, from `assists`. Unresolved assisters (`assist_player_id` `NULL`) are left out. Only published when `pbp` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season`, `season_type`, `team_id`, `assist_player_id`, `player_id` | | Grain; `player_id` is the scorer |
+| `assists` | BIGINT | Made shots the assister set up for the scorer |
+| `points` | BIGINT | Points from those shots (`sum(shot_value)`) |
+
 ### `hoopdata_info`
 
 One row describing the data. It reads `manifest.json` at query time, so it shows the latest run without reopening or rebuilding anything.
@@ -462,6 +567,7 @@ select dataset, last_updated, complete from hoopdata_datasets
 - **`last_updated`**: UTC time the latest item was recorded.
 - **`selection`**: what the data root holds, saved by every ingest and added to by `--season`, `--all-seasons` and `--datasets`. `datasets` lists the selected datasets, core first. `seasons` is `"all"` (every season from 1996-97 on, including future ones) or a list of seasons. A selection only grows. Deleting a dataset's folder removes it on the next ingest. A v1 manifest without `selection` is read as core with all seasons.
 - **`items`**: one entry per table, season and season type (no `PlayIn` items before 2019-20), holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
+- **Play-by-play items** fill in their missing games: `rows` is the number of actions the latest fetch wrote, `0` when it had no games left to fetch. A failed one has `error` like `1 of 8 games failed, first: ConnectionError: ...`, and keeps the games it fetched.
 - **Season-only items**, for a table whose source doesn't split by season type (`official_rosters`, `coach_seasons`), have `season_type` set to `null`: one item per table and season.
 - **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
 - **`datasets`**: each selected dataset's status as of the latest run, read by `hoopdata_datasets`.
