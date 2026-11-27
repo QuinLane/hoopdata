@@ -29,7 +29,7 @@ with pbp_sums as (
         count(*) filter (where action_type = 'Free Throw') as fta,
         -- Player rebounds only: team rebounds have no person_id.
         count(*) filter (where action_type = 'Rebound' and person_id is not null) as reb,
-        count(*) filter (where action_type = 'Made Shot' and description like '%AST)%') as ast,
+        count(*) filter (where action_type = 'Made Shot' and description like '%AST)') as ast,
         count(*) filter (where description like '%STEAL%') as stl,
         count(*) filter (where description like '%BLOCK%') as blk,
         count(*) filter (where action_type = 'Turnover') as tov,

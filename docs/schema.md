@@ -463,7 +463,7 @@ Whether a game's play-by-play adds up to its box scores: one row per game held i
 - **Free throws**: `fta` counts `Free Throw` actions, `ftm` those whose `description` doesn't start with `MISS`.
 - **`pts`**: `shot_value` of each `Made Shot`, plus `ftm`.
 - **`reb`**: `Rebound` actions by a player. Team rebounds (`person_id` NULL) aren't counted, as in the box score.
-- **`ast`**: `Made Shot` actions whose `description` holds `AST)`, like `(Jokic 1 AST)`.
+- **`ast`**: `Made Shot` actions whose `description` ends with `AST)`, like `(Jokic 1 AST)`, as in `assists`.
 - **`stl`** and **`blk`**: actions whose `description` holds `STEAL` or `BLOCK` (their `action_type` is empty).
 - **`tov`**: `Turnover` actions, team turnovers included.
 - **`pf`**: `Foul` actions except technicals: `sub_type` `Technical`, `Double Technical`, `Defense 3 Second` and `Flopping` (a non-unsportsmanlike technical) aren't counted. Flagrant, take and away-from-play fouls are. Pinned against the fixture games, where it matches every team; counting every `Foul` overcounts by the technicals. Coaches' technicals have `team_id` 0, so they're never a team's.
