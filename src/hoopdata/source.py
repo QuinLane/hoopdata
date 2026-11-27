@@ -42,25 +42,15 @@ class NbaApiSource:
             )
         )
 
-    def player_advanced_game_log(self, season, season_type):
-        from nba_api.stats.endpoints import playergamelogs
+    def advanced_box_scores(self, season, season_type, kind):
+        from nba_api.stats.endpoints import playergamelogs, teamgamelogs
 
+        endpoint = playergamelogs.PlayerGameLogs if kind == PLAYER else teamgamelogs.TeamGameLogs
         return self._request(
-            lambda: playergamelogs.PlayerGameLogs(
+            lambda: endpoint(
                 season_nullable=season,
                 season_type_nullable=season_type,
-                measure_type_player_game_logs_nullable="Advanced",
-                timeout=self.timeout,
-            )
-        )
-
-    def team_advanced_game_log(self, season, season_type):
-        from nba_api.stats.endpoints import teamgamelogs
-
-        return self._request(
-            lambda: teamgamelogs.TeamGameLogs(
-                season_nullable=season,
-                season_type_nullable=season_type,
+                # nba_api's real keyword for both endpoints, TeamGameLogs included.
                 measure_type_player_game_logs_nullable="Advanced",
                 timeout=self.timeout,
             )
@@ -102,12 +92,8 @@ class ReplaySource:
         path = self.fixtures_dir / _game_log_name(season, season_type, kind)
         return json.loads(path.read_text(encoding="utf-8"))
 
-    def player_advanced_game_log(self, season, season_type):
-        path = self.fixtures_dir / _player_advanced_game_log_name(season, season_type)
-        return json.loads(path.read_text(encoding="utf-8"))
-
-    def team_advanced_game_log(self, season, season_type):
-        path = self.fixtures_dir / _team_advanced_game_log_name(season, season_type)
+    def advanced_box_scores(self, season, season_type, kind):
+        path = self.fixtures_dir / _advanced_box_scores_name(season, season_type, kind)
         return json.loads(path.read_text(encoding="utf-8"))
 
     def all_players(self):
@@ -125,16 +111,10 @@ def record_game_log(source, fixtures_dir, season, season_type, kind):
     return _save(response, Path(fixtures_dir) / _game_log_name(season, season_type, kind))
 
 
-def record_player_advanced_game_log(source, fixtures_dir, season, season_type):
-    """Fetch one advanced player game log with ``source`` and save it as a replay fixture."""
-    response = source.player_advanced_game_log(season, season_type)
-    return _save(response, Path(fixtures_dir) / _player_advanced_game_log_name(season, season_type))
-
-
-def record_team_advanced_game_log(source, fixtures_dir, season, season_type):
-    """Fetch one advanced team game log with ``source`` and save it as a replay fixture."""
-    response = source.team_advanced_game_log(season, season_type)
-    return _save(response, Path(fixtures_dir) / _team_advanced_game_log_name(season, season_type))
+def record_advanced_box_scores(source, fixtures_dir, season, season_type, kind):
+    """Fetch one season type's advanced box scores with ``source`` and save them as a replay fixture."""
+    response = source.advanced_box_scores(season, season_type, kind)
+    return _save(response, Path(fixtures_dir) / _advanced_box_scores_name(season, season_type, kind))
 
 
 def record_all_players(source, fixtures_dir, player_ids):
@@ -160,12 +140,12 @@ def _save(response, path):
 
 
 def _game_log_name(season, season_type, kind):
-    return f"game_log_{kind}_{season}_{season_type.replace(' ', '_').lower()}.json"
+    return _fixture_name("game_log", season, season_type, kind)
 
 
-def _player_advanced_game_log_name(season, season_type):
-    return f"player_advanced_game_log_{season}_{season_type.replace(' ', '_').lower()}.json"
+def _advanced_box_scores_name(season, season_type, kind):
+    return _fixture_name("advanced_box_scores", season, season_type, kind)
 
 
-def _team_advanced_game_log_name(season, season_type):
-    return f"team_advanced_game_log_{season}_{season_type.replace(' ', '_').lower()}.json"
+def _fixture_name(prefix, season, season_type, kind):
+    return f"{prefix}_{kind}_{season}_{season_type.replace(' ', '_').lower()}.json"
