@@ -24,7 +24,7 @@ def db(tmp_path):
     con.close()
 
 
-def test_shots_hold_each_attempt_as_given_with_only_the_kept_columns(db):
+def test_shots_hold_each_shot_as_given_with_only_the_kept_columns(db):
     columns = db.execute("select column_name, column_type from (describe shots)").fetchall()
     row = db.execute(
         "select * from shots where game_id = '0022300034' and game_event_id = 13 and player_id = ?", [JOKIC]
