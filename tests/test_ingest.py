@@ -590,7 +590,7 @@ def test_games_have_one_row_each_with_home_and_away_from_the_matchup(db):
         ("0022300604", "2023-24", "Regular Season", date(2024, 1, 21), SUNS, PACERS, 117, 110),
         ("0022300614", "2023-24", "Regular Season", date(2024, 1, 23), PACERS, DENVER, 109, 114),
         ("0042300151", "2023-24", "Playoffs", date(2024, 4, 20), DENVER, LAKERS, 114, 103),
-        ("0052300111", "2023-24", "PlayIn", date(2024, 4, 16), PELICANS, LAKERS, 106, 110),
+        ("0052300121", "2023-24", "PlayIn", date(2024, 4, 16), PELICANS, LAKERS, 106, 110),
     ]
     assert db.execute("select distinct neutral_site from games").fetchall() == [(False,)]
 
@@ -671,7 +671,7 @@ def test_team_game_stats_calculates_per_game_percentages(db):
 
 
 class BackfillSource(ReplaySource):
-    """Replay source that logs which seasons it was asked for and stands in 2022-23 for seasons without fixtures."""
+    """Replay source that logs which seasons it was asked for and stands in 2022-23 for game logs without fixtures."""
 
     def __init__(self, fixtures_dir):
         super().__init__(fixtures_dir)
@@ -683,9 +683,10 @@ class BackfillSource(ReplaySource):
             self.seasons_requested.append(season)
         if season_type == PLAY_IN and kind == PLAYER:
             self.play_in_seasons_requested.append(season)
-        if season not in ("2022-23", "2023-24"):
-            season = "2022-23"
-        return super().game_log(season, season_type, kind)
+        try:
+            return super().game_log(season, season_type, kind)
+        except FileNotFoundError:
+            return super().game_log("2022-23", season_type, kind)
 
 
 ALL_SEASONS_TO_2023_24 = [
@@ -949,18 +950,40 @@ def test_adding_a_season_guesses_bios_only_for_the_new_season(tmp_path, capsys):
 def test_play_in_games_are_stored_as_their_own_season_type(db):
     # Fixture Play-In game: the Lakers won at New Orleans, 110-106.
     game = db.execute(
-        "select game_id, season_type, home_team_id, away_team_id, home_pts, away_pts from games where game_id = '0052300111'"
+        "select game_id, season_type, home_team_id, away_team_id, home_pts, away_pts from games where game_id = '0052300121'"
     ).fetchone()
     team_rows = db.execute(
-        "select season_type, team_id, pts from team_box_scores where game_id = '0052300111' order by team_id"
+        "select season_type, team_id, pts from team_box_scores where game_id = '0052300121' order by team_id"
     ).fetchall()
     player_rows = db.execute(
-        "select distinct season_type from player_box_scores where game_id = '0052300111'"
+        "select distinct season_type from player_box_scores where game_id = '0052300121'"
     ).fetchall()
 
-    assert game == ("0052300111", "PlayIn", PELICANS, LAKERS, 106, 110)
+    assert game == ("0052300121", "PlayIn", PELICANS, LAKERS, 106, 110)
     assert team_rows == [("PlayIn", PELICANS, 106), ("PlayIn", LAKERS, 110)]
     assert player_rows == [("PlayIn",)]
+
+
+MEMPHIS = 1610612763
+
+
+def test_the_2019_20_bubble_play_in_game_is_stored_as_play_in(tmp_path):
+    # Portland beat Memphis 126-122 in the bubble on 2020-08-15, a game NBA labels Play-In.
+    ingest(BackfillSource(FIXTURES), Store(tmp_path), seasons=["2019-20"], today=date(2024, 7, 1))
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        game = con.execute(
+            """
+            select season, season_type, home_team_id, away_team_id, home_pts, away_pts
+            from games where game_id = '0051900111'
+            """
+        ).fetchone()
+        player_season_types = con.execute(
+            "select distinct season_type from player_box_scores where game_id = '0051900111'"
+        ).fetchall()
+
+    assert game == ("2019-20", "PlayIn", BLAZERS, MEMPHIS, 126, 122)
+    assert player_season_types == [("PlayIn",)]
 
 
 def test_play_in_is_fetched_only_from_2019_20_and_earlier_seasons_are_complete_without_it(tmp_path):
