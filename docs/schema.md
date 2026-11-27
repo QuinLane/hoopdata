@@ -191,7 +191,7 @@ One row describing the data. It reads `manifest.json` at query time, so it shows
 |---|---|---|
 | `schema_version` | INTEGER | Version of this schema (see below) |
 | `last_updated` | TIMESTAMP WITH TIME ZONE | When an item was last recorded in the manifest |
-| `seasons` | VARCHAR | The seasons the data root holds: `all` (every season, including future ones), or the fixed list, like `2022-23, 2023-24` |
+| `seasons` | VARCHAR[] | The seasons the data root holds: `['all']` (every season, including future ones), or the fixed list, like `['2022-23', '2023-24']` |
 
 ```sql
 select schema_version, last_updated, seasons from hoopdata_info
@@ -205,7 +205,7 @@ One row per dataset in the data root's selection, core included. Like `hoopdata_
 |---|---|---|
 | `dataset` | VARCHAR | Dataset name, like `core` |
 | `last_updated` | TIMESTAMP WITH TIME ZONE | When one of the dataset's items was last fetched |
-| `complete` | BOOLEAN | Every item in the selection has succeeded: every selected season (with `all`, every season through the latest) and season type, and for core a bio for every player |
+| `complete` | BOOLEAN | As of the dataset's last ingest, every item in the selection had succeeded: every selected season (with `all`, every season through the latest) and season type, and for core a bio for every player. With `all`, it stays true when a new season starts until the next ingest fetches it |
 
 ```sql
 select dataset, last_updated, complete from hoopdata_datasets

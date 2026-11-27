@@ -5,11 +5,11 @@ create view hoopdata_info as
 select
     schema_version,
     last_updated,
-    -- The selection's seasons: "all", or the fixed list like "2022-23, 2023-24".
+    -- The selection's seasons: ['all'], or the fixed list like ['2022-23', '2023-24'].
     case
         when json_type(selection, '$.seasons') = 'ARRAY'
-            then array_to_string(from_json(selection -> '$.seasons', '["VARCHAR"]'), ', ')
-        else selection ->> '$.seasons'
+            then from_json(selection -> '$.seasons', '["VARCHAR"]')
+        else [selection ->> '$.seasons']
     end as seasons
 from read_json(
     '{root}/manifest.json',

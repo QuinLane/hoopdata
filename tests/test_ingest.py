@@ -505,14 +505,14 @@ def test_hoopdata_info_seasons_is_the_fixed_list_held(tmp_path):
     ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
 
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
-        assert con.execute("select seasons from hoopdata_info").fetchone()[0] == "2022-23, 2023-24"
+        assert con.execute("select seasons from hoopdata_info").fetchone()[0] == ["2022-23", "2023-24"]
 
 
 def test_hoopdata_info_seasons_is_all_when_every_season_is_held(tmp_path):
     ingest(BackfillSource(FIXTURES), Store(tmp_path), seasons=ALL_SEASONS, today=date(2024, 7, 1))
 
     with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
-        assert con.execute("select seasons from hoopdata_info").fetchone()[0] == "all"
+        assert con.execute("select seasons from hoopdata_info").fetchone()[0] == ["all"]
 
 
 def test_later_ingest_updates_hoopdata_info_without_rebuilding_the_file(tmp_path):
