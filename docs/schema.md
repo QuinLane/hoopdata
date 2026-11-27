@@ -222,7 +222,30 @@ One row per season, team and player on the team's official roster, as NBA last r
 - Players gone before NBA's last report are missing. SEA 1996-97 lists 12 players where core has 16 who appeared: Craig Ehlo (62 games) isn't there. OKC 2024-25 misses Alex Reese and Malevy Leons.
 - A new season's rosters arrive only after its first game, since the teams come from core.
 
-Not stored from the source: `LeagueID`, the source `SEASON` (the start year), `NICKNAME`, `PLAYER_SLUG`, `SUPPLEMENTAL_STATUS` and the bio columns `HEIGHT`, `WEIGHT`, `BIRTH_DATE`, `AGE` and `SCHOOL` (bios live in `players`), and the coaching staff in the second result set.
+Not stored from the source: `LeagueID`, the source `SEASON` (the start year), `NICKNAME`, `PLAYER_SLUG`, `SUPPLEMENTAL_STATUS` and the bio columns `HEIGHT`, `WEIGHT`, `BIRTH_DATE`, `AGE` and `SCHOOL` (bios live in `players`), and the coaching staff in the second result set (stored in `coach_seasons`).
+
+### `coach_seasons` (rosters dataset)
+
+One row per season, team and coach on the team's staff, as NBA last reported it. Only in a data root whose selection includes `rosters`. Source: the second result set of the same `commonteamroster` requests as `official_rosters`, so no extra requests are made and the two items for a season succeed or fail together. Stored as Parquet under `rosters/coach_seasons/season=<season>/season.parquet`, one file per season.
+
+Only head and assistant coaches are kept: rows whose `COACH_TYPE` contains `Head Coach` or `Assistant Coach` (Head, Associate Head, Lead Assistant, Assistant, and Assistant Coach for Player Development). Trainers, assistant trainers and the strength and conditioning coach are dropped. The rule is on the name, so a new coaching title is kept.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `season` | VARCHAR | Season, like `2023-24` |
+| `team_id` | BIGINT | NBA team ID |
+| `coach_id` | BIGINT | NBA coach ID |
+| `first_name` | VARCHAR | Coach's first name |
+| `last_name` | VARCHAR | Coach's last name |
+| `coach_name` | VARCHAR | Coach's full name |
+| `coach_type` | VARCHAR | Role as given, like `Head Coach` or `Lead Assistant Coach` |
+
+**What the snapshot leaves out.** The staff is one snapshot, stored as given and not repaired:
+- Coaches gone before NBA's last report are missing. MEM 2024-25 lists only Tuomas Iisalo: Taylor Jenkins, fired in March 2025, isn't there.
+- The report can come after the season. NYK 2024-25 lists no head coach, since Tom Thibodeau was removed after his June 2025 firing.
+- Early seasons list only the head coach, like SEA 1996-97.
+
+Not stored from the source: `IS_ASSISTANT` (a role code that repeats `coach_type`), `SORT_SEQUENCE`, `SUB_SORT_SEQUENCE` and the source `SEASON`.
 
 ## Views
 
@@ -346,6 +369,39 @@ Every official roster row with core's team abbreviation and the player's bio: ev
 
 **No bio for players who never appeared.** `players` only covers players in a box score, so a player who never appeared in a game (like Nikola Topić, OKC 2024-25) has his name and jersey number here but `NULL` bio columns. `players.position` is left out: the roster's own `position` is kept.
 
+### `coaches` (rosters dataset)
+
+One row per coach in `coach_seasons`. Only published when `rosters` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `coach_id` | BIGINT | Grain |
+| `first_name`, `last_name`, `coach_name` | VARCHAR | As in the coach's latest season |
+| `first_season` | VARCHAR | Coach's first season on a staff |
+| `last_season` | VARCHAR | Coach's latest season on a staff |
+
+### `coach_teams` (rosters dataset)
+
+One row per coach and team. Only published when `rosters` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `coach_id`, `team_id` | BIGINT | Grain |
+| `coach_name` | VARCHAR | Name in the coach's latest season with that team |
+| `team_abbreviation` | VARCHAR | Team abbreviation, as in `team_coaches`, in the coach's latest season with that team |
+| `first_season` | VARCHAR | Coach's first season with that team |
+| `last_season` | VARCHAR | Coach's latest season with that team |
+| `seasons` | BIGINT | Seasons on that team's staff |
+| `head_coach_seasons` | BIGINT | Of those, seasons as `Head Coach` (an associate head coach doesn't count) |
+
+### `team_coaches` (rosters dataset)
+
+Each team's coaches per season: every `coach_seasons` column, plus this. Only published when `rosters` is in the selection.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `team_abbreviation` | VARCHAR | Team abbreviation in the team's latest game of the season in `team_box_scores` |
+
 ### `hoopdata_info`
 
 One row describing the data. It reads `manifest.json` at query time, so it shows the latest run without reopening or rebuilding anything.
@@ -405,7 +461,7 @@ select dataset, last_updated, complete from hoopdata_datasets
 - **`last_updated`**: UTC time the latest item was recorded.
 - **`selection`**: what the data root holds, saved by every ingest and added to by `--season`, `--all-seasons` and `--datasets`. `datasets` lists the selected datasets, core first. `seasons` is `"all"` (every season from 1996-97 on, including future ones) or a list of seasons. A selection only grows. Deleting a dataset's folder removes it on the next ingest. A v1 manifest without `selection` is read as core with all seasons.
 - **`items`**: one entry per table, season and season type (no `PlayIn` items before 2019-20), holding the outcome of its latest fetch: `status` (`succeeded` or `failed`), `fetched_at` (UTC), `rows` (`null` when it failed) and `error` (`null` when it succeeded). A failed item keeps its previous Parquet file, if any, and is retried on the next run.
-- **Season-only items**, for a table whose source doesn't split by season type (`official_rosters`), have `season_type` set to `null`: one item per table and season.
+- **Season-only items**, for a table whose source doesn't split by season type (`official_rosters`, `coach_seasons`), have `season_type` set to `null`: one item per table and season.
 - **The `players` item** has `season` and `season_type` set to `null`, and covers the bios fetched in the latest run that had new players to fetch. `rows` is the number of bios stored by that run. It is `failed` if any bio failed, with `error` like `2 of 120 bios failed, first: ConnectionError: ...`. Bios that failed are fetched again on the next run.
 - **`datasets`**: each selected dataset's status as of the latest run, read by `hoopdata_datasets`.
 - **`views_hash`**: internal. A fingerprint of the published views, the schema version and the selection, used to decide when `hoopdata.duckdb` must be rebuilt.
