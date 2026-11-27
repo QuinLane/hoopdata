@@ -77,6 +77,54 @@ def test_every_advanced_row_joins_a_core_box_score_and_every_core_box_score_has_
     assert matched == 27 + 2 + 16 + 64 + 4 + 19
 
 
+def test_team_advanced_box_scores_hold_the_official_rates_as_given_with_only_the_kept_columns(db):
+    columns = db.execute("select column_name, column_type from (describe team_advanced_box_scores)").fetchall()
+    row = db.execute(
+        "select * from team_advanced_box_scores where game_id = '0022300034' and team_id = ?", [NUGGETS]
+    ).fetchall()
+
+    assert columns == [
+        ("season", "VARCHAR"), ("season_type", "VARCHAR"), ("game_id", "VARCHAR"), ("team_id", "BIGINT"),
+        *[(rate, "DOUBLE") for rate in RATES if rate not in ("usg_pct", "pie")], ("poss", "BIGINT"), ("pie", "DOUBLE"),
+    ]
+    # Denver at New Orleans on 2023-11-17, exactly as the fixture gives it: for teams tm_tov_pct is a fraction.
+    assert row == [(
+        "2023-24", "Regular Season", "0022300034", NUGGETS,
+        111.1, 113.9, -2.8, 0.787, 2.85, 24.8, 0.245, 0.824, 0.529, 0.131, 0.542, 0.543, 100.0, 83.33, 99, 0.479,
+    )]
+
+
+def test_team_advanced_game_stats_carries_cores_team_date_and_result(db):
+    row = db.execute(
+        """
+        select team_abbreviation, game_date, wl, off_rating, poss
+        from team_advanced_game_stats where game_id = '0022300034' and team_id = ?
+        """,
+        [NUGGETS],
+    ).fetchone()
+
+    assert row == ("DEN", date(2023, 11, 17), "L", 111.1, 99)
+
+
+def test_every_team_advanced_row_joins_a_core_team_box_score_and_every_core_team_box_score_has_one(tmp_path):
+    ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2022-23", "2023-24"], datasets=["advanced"], today=SUMMER)
+
+    with duckdb.connect(str(tmp_path / "hoopdata.duckdb"), read_only=True) as con:
+        advanced_only, core_only, matched = con.execute(
+            """
+            select
+                count(*) filter (where core.game_id is null),
+                count(*) filter (where advanced.game_id is null),
+                count(*) filter (where core.game_id is not null and advanced.game_id is not null)
+            from team_advanced_box_scores as advanced
+            full join team_box_scores as core using (game_id, team_id)
+            """
+        ).fetchone()
+
+    assert (advanced_only, core_only) == (0, 0)
+    assert matched == 2 + 2 + 2 + 16 + 2 + 2
+
+
 class BackfillSource(ReplaySource):
     """Replay source that logs advanced requests and stands in 2022-23 for game logs without fixtures."""
 
@@ -97,6 +145,12 @@ class BackfillSource(ReplaySource):
         except FileNotFoundError:
             return super().player_advanced_game_log("2022-23", season_type)
 
+    def team_advanced_game_log(self, season, season_type):
+        try:
+            return super().team_advanced_game_log(season, season_type)
+        except FileNotFoundError:
+            return super().team_advanced_game_log("2022-23", season_type)
+
 
 def test_play_in_is_its_own_season_type_and_is_never_requested_before_2019_20(tmp_path):
     source = BackfillSource(FIXTURES)
@@ -112,7 +166,11 @@ def test_play_in_is_its_own_season_type_and_is_never_requested_before_2019_20(tm
         season_types = con.execute(
             "select distinct season, season_type from player_advanced_game_stats where game_id = '0051900111'"
         ).fetchall()
+        team_season_types = con.execute(
+            "select distinct season, season_type from team_advanced_game_stats where game_id = '0051900111'"
+        ).fetchall()
     assert season_types == [("2019-20", "PlayIn")]
+    assert team_season_types == [("2019-20", "PlayIn")]
 
 
 class FailingAdvancedPlayoffsSource(BackfillSource):
@@ -150,8 +208,8 @@ def test_the_estimate_counts_one_request_per_advanced_item(tmp_path, capsys):
 
     ingest(ReplaySource(FIXTURES), store, datasets=["advanced"], today=SUMMER)
 
-    # 2023-24 is the latest season, so core refetches its 6 game logs. advanced has 3 per season, all missing.
-    assert "About 12 requests, roughly 12 s (core: 6 · advanced: 6)" in capsys.readouterr().out
+    # 2023-24 is the latest season, so core refetches its 6 game logs. advanced has 6 per season, all missing.
+    assert "About 18 requests, roughly 18 s (core: 6 · advanced: 12)" in capsys.readouterr().out
 
 
 def test_without_advanced_selected_its_views_dont_exist(tmp_path):
@@ -161,3 +219,5 @@ def test_without_advanced_selected_its_views_dont_exist(tmp_path):
         views = {row[0] for row in con.execute("select view_name from duckdb_views() where not internal").fetchall()}
     assert "player_advanced_game_stats" not in views
     assert "player_advanced_box_scores" not in views
+    assert "team_advanced_game_stats" not in views
+    assert "team_advanced_box_scores" not in views
