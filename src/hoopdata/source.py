@@ -9,8 +9,9 @@ import time
 from pathlib import Path
 
 REGULAR_SEASON = "Regular Season"
+PLAY_IN = "PlayIn"
 PLAYOFFS = "Playoffs"
-SEASON_TYPES = [REGULAR_SEASON, PLAYOFFS]
+SEASON_TYPES = [REGULAR_SEASON, PLAY_IN, PLAYOFFS]
 
 PLAYER = "player"
 TEAM = "team"
