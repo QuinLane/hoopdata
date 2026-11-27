@@ -786,24 +786,31 @@ def test_passing_a_season_with_all_seasons_selected_keeps_all_and_fetches_nothin
 
 def test_adding_a_season_to_a_fixed_list_fetches_only_the_new_season(tmp_path):
     store = Store(tmp_path)
-    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 11, 26))
+    ingest(ReplaySource(FIXTURES), store, seasons=["2022-23"], today=date(2024, 7, 1))
 
     source = BackfillSource(FIXTURES)
-    ingest(source, store, seasons=["2023-24"], today=date(2024, 11, 26))
+    ingest(source, store, seasons=["2023-24"], today=date(2024, 7, 1))
+    nightly = BackfillSource(FIXTURES)
+    ingest(nightly, store, today=date(2024, 7, 2))
 
     assert source.seasons_requested == ["2023-24"]
     assert selection(tmp_path)["seasons"] == ["2022-23", "2023-24"]
+    # The next plain run keeps to the list: it refetches 2023-24, the latest, and fetches no season outside it.
+    assert nightly.seasons_requested == ["2023-24"]
 
 
 def test_all_seasons_widens_a_fixed_list_to_all(tmp_path):
     store = Store(tmp_path)
     ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], today=date(2024, 7, 1))
+    fixed = BackfillSource(FIXTURES)
+    ingest(fixed, store, today=date(2024, 11, 26))
 
     source = BackfillSource(FIXTURES)
-    ingest(source, store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
+    ingest(source, store, seasons=ALL_SEASONS, today=date(2024, 11, 26))
 
+    assert fixed.seasons_requested == []
     assert selection(tmp_path)["seasons"] == "all"
-    assert source.seasons_requested == ALL_SEASONS_TO_2023_24[:-2] + ["2023-24"]
+    assert source.seasons_requested == ALL_SEASONS_TO_2023_24[:-2] + ["2024-25"]
 
 
 def test_a_fixed_list_does_not_gain_a_new_season(tmp_path):
@@ -818,6 +825,8 @@ def test_a_fixed_list_does_not_gain_a_new_season(tmp_path):
 
 
 def test_all_seasons_gains_a_new_season(tmp_path):
+    # v1 fetched the same here: with all seasons a plain run behaves as v1's did. The fixed-list
+    # counterpart, test_a_fixed_list_does_not_gain_a_new_season, is the one that tells them apart.
     store = Store(tmp_path)
     ingest(BackfillSource(FIXTURES), store, seasons=ALL_SEASONS, today=date(2024, 7, 1))
 
