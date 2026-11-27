@@ -184,6 +184,25 @@ def test_a_pbp_item_whose_core_season_type_isnt_held_fails_without_requests_and_
     assert retry_report.failed == []
 
 
+class EmptyCorePlayoffsSource(PlayByPlaySource):
+    """Replay source whose 2022-23 playoffs game logs come back with no games, as before the playoffs start."""
+
+    def game_log(self, season, season_type, kind):
+        response = super().game_log(season, season_type, kind)
+        if (season, season_type) == ("2022-23", "Playoffs"):
+            response["resultSets"][0]["rowSet"] = []
+        return response
+
+
+def test_a_pbp_item_whose_core_season_type_holds_no_games_fails_without_requests(tmp_path):
+    source = EmptyCorePlayoffsSource(FIXTURES)
+    report = ingest(source, Store(tmp_path), seasons=["2022-23"], datasets=["pbp"], today=SUMMER)
+
+    assert [item.name for item in report.failed] == ["play_by_play 2022-23 Playoffs"]
+    assert "core holds no team box scores for 2022-23 Playoffs" in report.failed[0].error
+    assert "0042200311" not in source.play_by_play_requests
+
+
 def test_there_are_no_play_in_items_before_2019_20(tmp_path):
     # No core fixtures exist for 2018-19, so core holds nothing and every pbp item of the season fails.
     report = ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2018-19"], datasets=["pbp"], today=SUMMER)

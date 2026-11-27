@@ -175,10 +175,16 @@ class MissingCoreError(Exception):
 
 def _fetch_shot_charts(source, store, season, season_type):
     """Each team's shot chart, for every team in core's team box scores of ``season`` and ``season_type``."""
-    team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
-    if team_box_scores is None:
-        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
+    team_box_scores = _core_team_box_scores(store, season, season_type)
     return [source.shot_chart(season, season_type, team_id) for team_id in sorted(set(team_box_scores["team_id"]))]
+
+
+def _core_team_box_scores(store, season, season_type):
+    """Core's team box scores of ``season`` and ``season_type``, raising ``MissingCoreError`` if it holds none."""
+    team_box_scores = store.read_partition(TEAM_BOX_SCORES, season, season_type)
+    if team_box_scores is None or team_box_scores.empty:
+        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
+    return team_box_scores
 
 
 def _fetch_official_rosters(source, store, season):
@@ -202,8 +208,7 @@ def _fetch_play_by_play(source, store, season, season_type):
     game is logged and the rest are still fetched, then the item fails. If core holds no games for
     them, the item fails without any requests.
     """
-    if store.read_partition(TEAM_BOX_SCORES, season, season_type) is None:
-        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
+    _core_team_box_scores(store, season, season_type)
     game_ids = _games_without_play_by_play(store, season, season_type)
     rows, errors = 0, []
     for game_id in game_ids:
