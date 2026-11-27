@@ -114,18 +114,11 @@ class Store:
 
         ``season`` lives in the hive folder name, so it is left out of the file.
         """
-        folder = self.dataset_root(dataset) / table / f"season={season}"
-        path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
-        _write_parquet(df.drop(columns="season"), path)
+        _write_parquet(df.drop(columns="season"), self._partition_path(table, season, season_type, dataset))
 
     def read_partition(self, table, season, season_type, dataset=CORE):
         """Read one table/season/season_type partition of ``dataset``, or ``None`` if it hasn't been written yet."""
-        folder = self.dataset_root(dataset) / table / f"season={season}"
-        path = folder / f"{season_type.replace(' ', '_').lower()}.parquet"
-        if not path.exists():
-            return None
-        with duckdb.connect() as con:
-            return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
+        return _read_parquet(self._partition_path(table, season, season_type, dataset))
 
     def write_table(self, table, df):
         """Atomically write a whole unpartitioned table as one Parquet file."""
@@ -133,11 +126,12 @@ class Store:
 
     def read_table(self, table):
         """Read an unpartitioned table, or ``None`` if it hasn't been written yet."""
-        path = self.root / f"{table}.parquet"
-        if not path.exists():
-            return None
-        with duckdb.connect() as con:
-            return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
+        return _read_parquet(self.root / f"{table}.parquet")
+
+    def _partition_path(self, table, season, season_type, dataset):
+        """The Parquet file of one table/season/season_type partition of ``dataset``."""
+        folder = self.dataset_root(dataset) / table / f"season={season}"
+        return folder / f"{season_type.replace(' ', '_').lower()}.parquet"
 
     def distinct_values(self, table, column):
         """The distinct values of ``column`` across every partition of ``table``, empty if none are written."""
@@ -185,6 +179,14 @@ def _write_parquet(df, path):
             con.execute(f"copy data to '{_sql_path(temp)}' (format parquet)")
 
     _replace_atomically(path, write)
+
+
+def _read_parquet(path):
+    """Read one Parquet file, or ``None`` if it hasn't been written yet."""
+    if not path.exists():
+        return None
+    with duckdb.connect() as con:
+        return con.execute(f"select * from read_parquet('{_sql_path(path)}')").df()
 
 
 def _replace_atomically(path, write):
