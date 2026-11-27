@@ -155,7 +155,7 @@ DATASETS = {
 
 
 class MissingCoreError(Exception):
-    """Core doesn't hold the season and season type a dataset's fetch reads from it, so the item fails and is retried."""
+    """Core doesn't hold the games a dataset's fetch reads from it, so the item fails and is retried."""
 
 
 def _fetch_shot_charts(source, store, season, season_type):
@@ -171,12 +171,8 @@ def _fetch_team_rosters(source, store, season):
     partitions = [store.read_partition(TEAM_BOX_SCORES, season, season_type) for season_type in _season_types(season)]
     team_ids = sorted({team_id for df in partitions if df is not None for team_id in df["team_id"]})
     if not team_ids:
-        raise MissingCoreSeasonError(f"core holds no games for {season} yet")
+        raise MissingCoreError(f"core holds no games for {season} yet")
     return [source.team_roster(season, team_id) for team_id in team_ids]
-
-
-class MissingCoreSeasonError(Exception):
-    """A dataset's item needs core's games for a season that core doesn't hold yet."""
 
 
 class EmptySelectionError(Exception):
