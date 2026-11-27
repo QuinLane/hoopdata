@@ -80,7 +80,9 @@ class Dataset:
         return {table for tables in self.tables.values() for table, _ in tables}
 
     def to_fetch(self, store, seasons, latest):
-        """The requests with failed or missing items in ``seasons``, as ``(season, season_type, kind, tables)``.
+        """The fetches with failed or missing items in ``seasons``, as ``(season, season_type, kind, tables)``.
+
+        Each fetch is one call to ``fetch``, which can make several requests.
 
         ``tables`` lists only the ``(table, transform)`` pairs to write. A season with every item
         succeeded is skipped, except ``latest``, which is fetched in full.
@@ -88,7 +90,7 @@ class Dataset:
         return [
             (season, season_type, kind, tables)
             for season in seasons
-            for season_type, kind, tables in self._requests_to_fetch(store, season, season == latest)
+            for season_type, kind, tables in self._fetches(store, season, season == latest)
         ]
 
     def request_count(self, to_fetch):
@@ -97,17 +99,18 @@ class Dataset:
             return len(to_fetch)
         return sum(self.requests_per_item[season_type] for _, season_type, _, _ in to_fetch)
 
-    def _requests_to_fetch(self, store, season, refetch_complete):
+    def _fetches(self, store, season, refetch_complete):
+        """``season``'s fetches with failed or missing items, as ``(season_type, kind, tables)``."""
         season_types = [t for t in _season_types(season) if self.requests_per_item is None or t in self.requests_per_item]
         all_items = {(table, season_type) for season_type in season_types for table in self.table_names}
         to_fetch = all_items - store.succeeded_items(season) or (all_items if refetch_complete else set())
-        requests = []
+        fetches = []
         for season_type in season_types:
             for kind, tables in self.tables.items():
                 tables = [(table, to_table) for table, to_table in tables if (table, season_type) in to_fetch]
                 if tables:
-                    requests.append((season_type, kind, tables))
-        return requests
+                    fetches.append((season_type, kind, tables))
+        return fetches
 
 
 # The ``datasets`` value that means every dataset in ``DATASETS``.
@@ -219,17 +222,17 @@ def ingest(source, store, seasons=None, datasets=None, today=None):
     today = today or date.today()
     latest = _season(_latest_season_start_year(today))
     selected = _all_seasons(today) if selection["seasons"] == ALL_SEASONS else selection["seasons"]
-    requests = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
-    counts = {name: DATASETS[name].request_count(to_fetch) for name, to_fetch in requests.items()}
+    fetches = {name: DATASETS[name].to_fetch(store, selected, latest) for name in selection["datasets"]}
+    counts = {name: DATASETS[name].request_count(to_fetch) for name, to_fetch in fetches.items()}
     counts[CORE] += len(_players_without_bios(store)) + NEW_PLAYERS_PER_SEASON * len(
-        _seasons_without_box_scores(store, requests[CORE])
+        _seasons_without_box_scores(store, fetches[CORE])
     )
     print(_estimate(counts))
     report = Report(store.new_log_path())
     with _logging_to(report.log_path):
-        for name, to_fetch in requests.items():
+        for name, to_fetch in fetches.items():
             for season, season_type, kind, tables in to_fetch:
-                _fetch_game_log(source, store, report, DATASETS[name], season, season_type, kind, tables)
+                _fetch_and_write(source, store, report, DATASETS[name], season, season_type, kind, tables)
         _add_new_players(source, store, report)
         store.write_table(TEAMS, transform.teams(static_teams.get_teams()))
         store.write_datasets([_dataset_status(store, name, selected) for name in selection["datasets"]])
@@ -338,8 +341,8 @@ def _season_types(season):
     return [t for t in SEASON_TYPES if t != PLAY_IN or season >= FIRST_PLAY_IN_SEASON]
 
 
-def _fetch_game_log(source, store, report, dataset, season, season_type, kind, tables):
-    """Fetch one of ``dataset``'s game logs and write each of its tables, recording each as an item."""
+def _fetch_and_write(source, store, report, dataset, season, season_type, kind, tables):
+    """Make one of ``dataset``'s fetches, which can take several requests, and write and record each of its tables."""
     try:
         raw = dataset.fetch(source, store, season, season_type, kind)
     except Exception as e:

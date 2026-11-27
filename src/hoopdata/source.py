@@ -111,7 +111,7 @@ class ReplaySource:
         return json.loads(path.read_text(encoding="utf-8"))
 
     def shot_chart(self, season, season_type, team_id):
-        path = self.fixtures_dir / _shot_chart_name(season, season_type, team_id)
+        path = self.fixtures_dir / _fixture_name("shot_chart", season, season_type, team_id)
         return json.loads(path.read_text(encoding="utf-8"))
 
     def all_players(self):
@@ -142,7 +142,7 @@ def record_shot_chart(source, fixtures_dir, season, season_type, team_id, game_i
     game_id = result["headers"].index("GAME_ID")
     wanted = set(game_ids)
     result["rowSet"] = [row for row in result["rowSet"] if row[game_id] in wanted]
-    return _save(response, Path(fixtures_dir) / _shot_chart_name(season, season_type, team_id))
+    return _save(response, Path(fixtures_dir) / _fixture_name("shot_chart", season, season_type, team_id))
 
 
 def record_all_players(source, fixtures_dir, player_ids):
@@ -173,10 +173,6 @@ def _game_log_name(season, season_type, kind):
 
 def _advanced_box_scores_name(season, season_type, kind):
     return _fixture_name("advanced_box_scores", season, season_type, kind)
-
-
-def _shot_chart_name(season, season_type, team_id):
-    return f"shot_chart_{team_id}_{season}_{season_type.replace(' ', '_').lower()}.json"
 
 
 def _fixture_name(prefix, season, season_type, kind):
