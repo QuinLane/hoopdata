@@ -124,6 +124,14 @@ class Store:
         """Read one table/season/season_type partition of ``dataset``, or ``None`` if it hasn't been written yet."""
         return _read_parquet(self._partition_path(table, season, season_type, dataset))
 
+    def write_game(self, table, season, season_type, game_id, df, dataset):
+        """Atomically write one game of a per-game table, in a folder named like the season type's partition file."""
+        _write_parquet(df, self._games_folder(table, season, season_type, dataset) / f"{game_id}.parquet")
+
+    def held_games(self, table, season, season_type, dataset):
+        """The game IDs a per-game table holds for ``season`` and ``season_type``."""
+        return {path.stem for path in self._games_folder(table, season, season_type, dataset).glob("*.parquet")}
+
     def write_table(self, table, df):
         """Atomically write a whole unpartitioned table as one Parquet file."""
         _write_parquet(df, self.root / f"{table}.parquet")
@@ -137,6 +145,10 @@ class Store:
         folder = self.dataset_root(dataset) / table / f"season={season}"
         name = SEASON_ONLY_FILE if season_type is None else season_type.replace(" ", "_").lower()
         return folder / f"{name}.parquet"
+
+    def _games_folder(self, table, season, season_type, dataset):
+        """Like ``season=2023-24/regular_season``: the partition file's path without ``.parquet``."""
+        return self._partition_path(table, season, season_type, dataset).with_suffix("")
 
     def distinct_values(self, table, column):
         """The distinct values of ``column`` across every partition of ``table``, empty if none are written."""
