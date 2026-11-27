@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from hoopdata import transform
 from hoopdata.ingest import ingest
 from hoopdata.source import PLAYER, PLAYOFFS, REGULAR_SEASON, ReplaySource
 from hoopdata.store import Store
@@ -26,6 +27,8 @@ CELTICS = 1610612738
 SUNS = 1610612756
 BLAZERS = 1610612757
 JAZZ = 1610612762
+HEAT = 1610612748
+WIZARDS = 1610612764
 
 
 @pytest.fixture
@@ -532,6 +535,29 @@ def test_games_have_one_row_each_with_home_and_away_from_the_matchup(db):
         ("0022300604", "2023-24", "Regular Season", date(2024, 1, 21), SUNS, PACERS, 117, 110),
         ("0022300614", "2023-24", "Regular Season", date(2024, 1, 23), PACERS, DENVER, 109, 114),
         ("0042300151", "2023-24", "Playoffs", date(2024, 4, 20), DENVER, LAKERS, 114, 103),
+    ]
+    assert db.execute("select distinct neutral_site from games").fetchall() == [(False,)]
+
+
+def test_a_neutral_site_game_is_kept_and_flagged_with_the_lower_team_id_as_home():
+    # Recorded rows: Heat vs Wizards in Mexico City, where both matchups read "@", and a normal game.
+    raw = {"resultSets": [{
+        "name": "LeagueGameLog",
+        "headers": ["GAME_ID", "GAME_DATE", "TEAM_ID", "MATCHUP", "PTS"],
+        "rowSet": [
+            ["0022400148", "2024-11-02", DENVER, "DEN vs. UTA", 129],
+            ["0022400147", "2024-11-02", HEAT, "MIA @ WAS", 118],
+            ["0022400148", "2024-11-02", JAZZ, "UTA @ DEN", 103],
+            ["0022400147", "2024-11-02", WIZARDS, "WAS @ MIA", 98],
+        ],
+    }]}
+
+    df = transform.games(raw, "2024-25", REGULAR_SEASON).sort_values("game_id")
+
+    rows = df[["game_id", "neutral_site", "home_team_id", "away_team_id", "home_pts", "away_pts"]]
+    assert [tuple(row) for row in rows.itertuples(index=False)] == [
+        ("0022400147", True, HEAT, WIZARDS, 118, 98),
+        ("0022400148", False, DENVER, JAZZ, 129, 103),
     ]
 
 

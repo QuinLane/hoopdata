@@ -41,3 +41,11 @@ The spec in #1 was built on the integration branch `issue-001` and merged throug
 
 - **Slow tests:** the suite takes about 50 seconds, because some tests run a full 1996-97-onwards ingest against the test data.
 - **Unicode names on Windows:** the Python example crashes on names like "Dončić" in a Windows console unless `PYTHONIOENCODING=utf-8` is set. The problem predates v1 and was left as is.
+
+## First real ingest (test 001)
+
+v1 was tested against the real stats.nba.com API on 2026-11-26. The details are in `docs/ingest_test001.md`.
+
+- **2024-25 smoke run:** passed in 9.6 minutes. All 7 items succeeded and the exit code was 0. The game logs took 4 seconds and the 569 bios took the rest, at about 1 second each. Running it again took 5 seconds and refetched no bios. The Python example's numbers match reality, and the logs have no errors.
+- **2026-27 empty playoffs:** passed in 2.3 minutes. The in-progress season's playoff items came back as 0 rows, not failures. The views query fine with the empty partitions, so no fix was needed. Only the 129 players without bios were fetched.
+- **Bug, neutral-site games (fixed):** the `games` table dropped games played at neutral sites (Mexico City, Paris, the NBA Cup semifinals in Las Vegas): 5 games in 2024-25 and 1 so far in 2026-27. `transform.games` needs one team's `vs.` matchup and the other's `@`, and these games don't have that pair, because both matchups read `@`. Standings and averages were unaffected because no view reads `games`. The test data has no neutral-site games, so the tests missed it. The fix keeps them with a new `neutral_site` column, and the lower team ID is listed as home.

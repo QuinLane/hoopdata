@@ -59,7 +59,7 @@ Not stored from the source: per-game percentages, video-available and the matchu
 
 ### `games`
 
-One row per game. Derived from the team game log with no extra requests: the team whose matchup reads `vs.` is home, the one whose matchup reads `@` is away. Stored as Parquet under `games/season=<season>/`.
+One row per game. Derived from the team game log with no extra requests: the team whose matchup reads `vs.` is home, the one whose matchup reads `@` is away. At a neutral site (Mexico City, Paris, the NBA Cup semifinals in Las Vegas) both matchups read `@`, so the game is flagged `neutral_site`, and home and away only put the two teams in order: the lower team ID is home. Stored as Parquet under `games/season=<season>/`.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -67,6 +67,7 @@ One row per game. Derived from the team game log with no extra requests: the tea
 | `season` | VARCHAR | Season, like `2023-24` |
 | `season_type` | VARCHAR | `Regular Season` or `Playoffs` |
 | `game_date` | DATE | Date the game was played |
+| `neutral_site` | BOOLEAN | Played at a neutral site. When true, home and away only order the teams: the lower team ID is home |
 | `home_team_id` | BIGINT | Home team's NBA team ID |
 | `away_team_id` | BIGINT | Away team's NBA team ID |
 | `home_pts` | BIGINT | Home team's points |

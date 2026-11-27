@@ -42,15 +42,21 @@ def team_box_scores(raw, season, season_type):
 
 
 def games(raw, season, season_type):
-    """One row per game from the team game log: ``vs.`` in the matchup means home, ``@`` away."""
-    df = _result_set(raw)
-    home = df[df["matchup"].str.contains(" vs. ", regex=False)]
-    away = df[df["matchup"].str.contains(" @ ", regex=False)]
-    df = home.merge(away, on="game_id", suffixes=("_home", "_away"))
+    """One row per game from the team game log: ``vs.`` in the matchup means home, ``@`` away.
+
+    At a neutral site both matchups read ``@``. That game is flagged ``neutral_site``, and its
+    home and away only put the two teams in order: the lower team ID is home.
+    """
+    df = _result_set(raw).sort_values("team_id")
+    df["listed_home"] = df["matchup"].str.contains(" vs. ", regex=False)
+    df["neutral_site"] = ~df.groupby("game_id")["listed_home"].transform("any")
+    is_home = df["listed_home"] | (df["neutral_site"] & ~df.duplicated("game_id"))
+    df = df[is_home].merge(df[~is_home], on="game_id", suffixes=("_home", "_away"))
     return pd.DataFrame({
         "season": pd.Series(season, index=df.index, dtype="string"),
         "season_type": pd.Series(season_type, index=df.index, dtype="string"),
         "game_id": df["game_id"].astype("string"),
+        "neutral_site": df["neutral_site_home"].astype("boolean"),
         "game_date": pd.to_datetime(df["game_date_home"]).dt.date,
         "home_team_id": df["team_id_home"].astype("Int64"),
         "away_team_id": df["team_id_away"].astype("Int64"),
