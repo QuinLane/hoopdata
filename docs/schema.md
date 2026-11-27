@@ -14,7 +14,7 @@ con.sql("select * from player_season_averages").df()
 - **`season`** is a string like `2023-24`.
 - **`season_type`** is `Regular Season`, `PlayIn` or `Playoffs`. Play-In games exist from 2019-20 on (including the 2019-20 bubble game NBA labels Play-In); earlier seasons have none.
 - **Stored tables hold raw counts only.** Every percentage is calculated in a view. The exception is the `advanced` dataset's tables, which hold NBA's official advanced rates exactly as given, with no rescaling (ADR 0001). Some are fractions and some are percents; each column's scale is documented with its table.
-- **Missing values** are `NULL`; integer columns stay integers.
+- **Missing values** are `NULL`; integer columns stay integers. The exception is the `pbp` dataset's `play_by_play`, stored as NBA gives it apart from one coding fix (spec #31): a missing value is whatever NBA sends, usually `0` or an empty string. Only blank scores and team-level actions' `person_id` are `NULL`; each column's meaning says which.
 
 ## Tables
 
