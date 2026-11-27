@@ -17,6 +17,10 @@ TEAM_BOX_SCORES = "team_box_scores"
 GAMES = "games"
 PLAYERS = "players"
 TEAMS = "teams"
+PLAYER_ADVANCED_BOX_SCORES = "player_advanced_box_scores"
+TEAM_ADVANCED_BOX_SCORES = "team_advanced_box_scores"
+
+ADVANCED = "advanced"
 
 FIRST_SEASON_START_YEAR = 1996
 
@@ -35,7 +39,9 @@ NEW_PLAYERS_PER_SEASON = 90
 # Rough requests for each dataset's full backfill of every season, shown in --help.
 # Core: ~135 game logs (30 seasons, regular season and playoffs, Play-In from 2019-20, 2 kinds) plus ~2,700 player
 # bios (NEW_PLAYERS_PER_SEASON for each season).
-FULL_BACKFILL_REQUESTS = {CORE: 2_800}
+# Advanced: ~135 requests, counted like core's game logs: one league-wide request per table (player and team) for
+# each season and season type (30 seasons, regular season and playoffs, Play-In from 2019-20).
+FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135}
 
 log = logging.getLogger(__name__)
 
@@ -94,13 +100,22 @@ class Dataset:
 # The ``datasets`` value that means every dataset in ``DATASETS``.
 ALL_DATASETS = "all"
 
-# Every dataset a data root can hold, by name. Only core until the dataset specs land.
+# Every dataset a data root can hold, by name.
 DATASETS = {
     CORE: Dataset(
         CORE,
         TABLES,
         lambda source, season, season_type, kind: source.game_log(season, season_type, kind),
         files("hoopdata").joinpath("views.sql").read_text(encoding="utf-8"),
+    ),
+    ADVANCED: Dataset(
+        ADVANCED,
+        {
+            PLAYER: [(PLAYER_ADVANCED_BOX_SCORES, transform.player_advanced_box_scores)],
+            TEAM: [(TEAM_ADVANCED_BOX_SCORES, transform.team_advanced_box_scores)],
+        },
+        lambda source, season, season_type, kind: source.advanced_box_scores(season, season_type, kind),
+        files("hoopdata").joinpath("advanced_views.sql").read_text(encoding="utf-8"),
     ),
 }
 

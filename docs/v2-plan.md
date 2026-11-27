@@ -9,7 +9,7 @@ v2 adds the data the v1 spec (#1) left out of scope. Each new source becomes an 
 | Dataset | What | Likely endpoint | Request grain | Rough first backfill |
 |---|---|---|---|---|
 | core (+ Play-In) | v1, plus Play-In games as a new season type `PlayIn` | `leaguegamelog`, `season_type=PlayIn` | season × kind | ~14 more requests |
-| `advanced` | Official advanced box scores, player and team | `playergamelogs` / `teamgamelogs`, `measure_type=Advanced` | season × season type × kind | ~125 requests |
+| `advanced` | Official advanced box scores, player and team | `playergamelogs` / `teamgamelogs`, `measure_type=Advanced` | season × season type × kind | ~135 requests |
 | `shots` | Shot charts | `shotchartdetail`, per team, player=0 | season × season type × team | ~1,400 requests, ~25 min |
 | `rosters` | Official rosters, including players who never appeared, and jersey numbers; head and assistant coaches | `commonteamroster` | team × season | ~930 requests, ~16 min |
 | `pbp` | Play-by-play, plus views only it can give (lineups, on/off, who assisted whom) | `playbyplayv3` | game | ~38,000 requests, ~11 h |

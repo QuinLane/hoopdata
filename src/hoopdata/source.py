@@ -42,6 +42,20 @@ class NbaApiSource:
             )
         )
 
+    def advanced_box_scores(self, season, season_type, kind):
+        from nba_api.stats.endpoints import playergamelogs, teamgamelogs
+
+        endpoint = playergamelogs.PlayerGameLogs if kind == PLAYER else teamgamelogs.TeamGameLogs
+        return self._request(
+            lambda: endpoint(
+                season_nullable=season,
+                season_type_nullable=season_type,
+                # nba_api's real keyword for both endpoints, TeamGameLogs included.
+                measure_type_player_game_logs_nullable="Advanced",
+                timeout=self.timeout,
+            )
+        )
+
     def all_players(self):
         from nba_api.stats.endpoints import commonallplayers
 
@@ -78,6 +92,10 @@ class ReplaySource:
         path = self.fixtures_dir / _game_log_name(season, season_type, kind)
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def advanced_box_scores(self, season, season_type, kind):
+        path = self.fixtures_dir / _advanced_box_scores_name(season, season_type, kind)
+        return json.loads(path.read_text(encoding="utf-8"))
+
     def all_players(self):
         return json.loads((self.fixtures_dir / ALL_PLAYERS_FILE).read_text(encoding="utf-8"))
 
@@ -91,6 +109,12 @@ def record_game_log(source, fixtures_dir, season, season_type, kind):
     """Fetch one game log with ``source`` and save it as a replay fixture."""
     response = source.game_log(season, season_type, kind)
     return _save(response, Path(fixtures_dir) / _game_log_name(season, season_type, kind))
+
+
+def record_advanced_box_scores(source, fixtures_dir, season, season_type, kind):
+    """Fetch one season type's advanced box scores with ``source`` and save them as a replay fixture."""
+    response = source.advanced_box_scores(season, season_type, kind)
+    return _save(response, Path(fixtures_dir) / _advanced_box_scores_name(season, season_type, kind))
 
 
 def record_all_players(source, fixtures_dir, player_ids):
@@ -116,4 +140,12 @@ def _save(response, path):
 
 
 def _game_log_name(season, season_type, kind):
-    return f"game_log_{kind}_{season}_{season_type.replace(' ', '_').lower()}.json"
+    return _fixture_name("game_log", season, season_type, kind)
+
+
+def _advanced_box_scores_name(season, season_type, kind):
+    return _fixture_name("advanced_box_scores", season, season_type, kind)
+
+
+def _fixture_name(prefix, season, season_type, kind):
+    return f"{prefix}_{kind}_{season}_{season_type.replace(' ', '_').lower()}.json"
