@@ -105,13 +105,13 @@ def test_one_failed_game_fails_the_item_and_the_next_run_fetches_only_that_game_
 
     assert [item.name for item in report.failed] == ["play_by_play 2023-24 Regular Season"]
     assert "1 of 8 games failed" in report.failed[0].error
-    # The other games were written as they were fetched, and are kept.
-    assert held_after_first == [("2022-23", 1), ("2023-24", 7)]
+    # The other games were written as they were fetched, and are kept. Each season also has a playoff and a Play-In game.
+    assert held_after_first == [("2022-23", 3), ("2023-24", 9)]
     assert retry.play_by_play_requests == ["0022300540"]
     assert retry_report.failed == []
     # 2023-24 is the latest season, but every one of its games is held, so none is requested again.
     assert nightly.play_by_play_requests == []
-    assert games_held(tmp_path) == [("2022-23", 1), ("2023-24", 8)]
+    assert games_held(tmp_path) == [("2022-23", 3), ("2023-24", 10)]
 
 
 def test_the_estimate_counts_one_request_per_core_game_not_held_yet(tmp_path, capsys):
@@ -124,10 +124,73 @@ def test_the_estimate_counts_one_request_per_core_game_not_held_yet(tmp_path, ca
     ingest(PlayByPlaySource(FIXTURES), store, today=IN_SEASON)
     retry = capsys.readouterr().out
 
-    # Core refetches the latest season's 6 game logs each run. Pbp first needs all 1 + 8 core games, then the one
-    # that failed.
-    assert "About 15 requests, roughly 15 s (core: 6 · pbp: 9)" in first
+    # Core refetches the latest season's 6 game logs each run. Pbp first needs all 3 + 10 core games, a regular season,
+    # playoff and Play-In game in 2022-23 and 8 + 1 + 1 in 2023-24, then the one that failed.
+    assert "About 19 requests, roughly 19 s (core: 6 · pbp: 13)" in first
     assert "About 7 requests, roughly 7 s (core: 6 · pbp: 1)" in retry
+
+
+def test_playoff_and_play_in_games_are_stored_under_their_own_season_type_with_the_same_columns_and_rules(tmp_path):
+    store = Store(tmp_path)
+    report = ingest(ReplaySource(FIXTURES), store, seasons=["2022-23", "2023-24"], datasets=["pbp"], today=SUMMER)
+
+    folder = tmp_path / "pbp" / "play_by_play" / "season=2023-24"
+    with duckdb.connect() as con:
+        def describe(path):
+            return con.execute(f"describe select * from read_parquet('{path.as_posix()}')").fetchall()
+
+        regular_season = describe(folder / "regular_season" / f"{OPENER}.parquet")
+        playoffs = describe(folder / "playoffs" / "0042300151.parquet")
+        play_in = describe(folder / "playin" / "0052300121.parquet")
+        team_ids_as_person_ids = con.execute(
+            f"select count(*) from read_parquet('{folder.as_posix()}/playoffs/0042300151.parquet') "
+            f"where person_id // 1000 = 1610612"
+        ).fetchone()[0]
+
+    assert report.failed == []
+    assert playoffs == regular_season
+    assert play_in == regular_season
+    assert (tmp_path / "pbp" / "play_by_play" / "season=2022-23" / "playoffs" / "0042200311.parquet").exists()
+    assert (tmp_path / "pbp" / "play_by_play" / "season=2022-23" / "playin" / "0052200121.parquet").exists()
+    assert team_ids_as_person_ids == 0
+
+
+class MissingCorePlayoffsSource(PlayByPlaySource):
+    """Replay source whose 2022-23 playoffs team game log times out while ``failing``."""
+
+    def __init__(self, fixtures_dir, failing=True):
+        super().__init__(fixtures_dir)
+        self.core_failing = failing
+
+    def game_log(self, season, season_type, kind):
+        if self.core_failing and (season, season_type, kind) == ("2022-23", "Playoffs", "team"):
+            raise ConnectionError("stats.nba.com timed out")
+        return super().game_log(season, season_type, kind)
+
+
+def test_a_pbp_item_whose_core_season_type_isnt_held_fails_without_requests_and_succeeds_once_core_has_it(tmp_path):
+    store = Store(tmp_path)
+    first = MissingCorePlayoffsSource(FIXTURES)
+    report = ingest(first, store, seasons=["2022-23"], datasets=["pbp"], today=SUMMER)
+
+    retry = MissingCorePlayoffsSource(FIXTURES, failing=False)
+    retry_report = ingest(retry, store, today=SUMMER)
+
+    pbp_failed = [item for item in report.failed if item.table == "play_by_play"]
+    assert [item.name for item in pbp_failed] == ["play_by_play 2022-23 Playoffs"]
+    assert "core holds no team box scores for 2022-23 Playoffs" in pbp_failed[0].error
+    assert "0042200311" not in first.play_by_play_requests
+    assert retry.play_by_play_requests == ["0042200311"]
+    assert retry_report.failed == []
+
+
+def test_there_are_no_play_in_items_before_2019_20(tmp_path):
+    # No core fixtures exist for 2018-19, so core holds nothing and every pbp item of the season fails.
+    report = ingest(ReplaySource(FIXTURES), Store(tmp_path), seasons=["2018-19"], datasets=["pbp"], today=SUMMER)
+
+    assert sorted(item.name for item in report.failed if item.table == "play_by_play") == [
+        "play_by_play 2018-19 Playoffs", "play_by_play 2018-19 Regular Season",
+    ]
 
 
 def test_without_pbp_selected_play_by_play_doesnt_exist(tmp_path):

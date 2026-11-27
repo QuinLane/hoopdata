@@ -50,7 +50,8 @@ NEW_PLAYERS_PER_SEASON = 90
 # Shots: one shot chart per team per season and season type, ~1,400 requests (30 teams in a regular season, 16 in
 # the playoffs, 8 in the Play-In).
 # Rosters: one team roster per team per season, ~930 requests (31 seasons of about 30 teams).
-# Pbp: one request per game, ~38,000 requests (about 1,230 games a season since 1996-97, plus the playoffs).
+# Pbp: one request per game, ~38,000 requests (about 1,230 games a season since 1996-97, plus the playoffs and
+# Play-In).
 FULL_BACKFILL_REQUESTS = {CORE: 2_800, ADVANCED: 135, SHOTS: 1_400, ROSTERS: 930, PBP: 38_000}
 
 log = logging.getLogger(__name__)
@@ -163,7 +164,6 @@ DATASETS = {
         {GAME: [(PLAY_BY_PLAY, None)]},
         lambda source, store, season, season_type, kind: _fetch_play_by_play(source, store, season, season_type),
         files("hoopdata").joinpath("pbp_views.sql").read_text(encoding="utf-8"),
-        season_types=(REGULAR_SEASON,),
         requests=lambda store, season, season_type: len(_games_without_play_by_play(store, season, season_type)),
     ),
 }
@@ -199,8 +199,11 @@ def _fetch_play_by_play(source, store, season, season_type):
 
     The games are those in core's team box scores of ``season`` and ``season_type``. Each game is
     written as soon as it's fetched, and a held game is never fetched again (ADR 0003). A failed
-    game is logged and the rest are still fetched, then the item fails.
+    game is logged and the rest are still fetched, then the item fails. If core holds no games for
+    them, the item fails without any requests.
     """
+    if store.read_partition(TEAM_BOX_SCORES, season, season_type) is None:
+        raise MissingCoreError(f"core holds no team box scores for {season} {season_type}")
     game_ids = _games_without_play_by_play(store, season, season_type)
     rows, errors = 0, []
     for game_id in game_ids:
