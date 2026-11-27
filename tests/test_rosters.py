@@ -4,6 +4,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from hoopdata import transform
 from hoopdata.ingest import ingest
 from hoopdata.source import ReplaySource
 from hoopdata.store import Store
@@ -126,6 +127,23 @@ def test_coach_views_follow_each_coach_across_teams_and_seasons(db):
         ("2022-23", NUGGETS, MALONE, "Michael", "Malone", "Michael Malone", "Head Coach", "DEN"),
         ("2023-24", NUGGETS, MALONE, "Michael", "Malone", "Michael Malone", "Head Coach", "DEN"),
     ]
+
+
+def test_coach_seasons_drops_a_staff_member_without_a_coach_type():
+    headers = ["TEAM_ID", "SEASON", "COACH_ID", "FIRST_NAME", "LAST_NAME", "COACH_NAME", "COACH_TYPE"]
+    nuggets = {"resultSets": [
+        {"headers": [], "rowSet": []},
+        {"headers": headers, "rowSet": [[NUGGETS, "2023", MALONE, "Michael", "Malone", "Michael Malone", "Head Coach"]]},
+    ]}
+    # The Lakers' only staff member has no type.
+    lakers = {"resultSets": [
+        {"headers": [], "rowSet": []},
+        {"headers": headers, "rowSet": [[LAKERS, "2023", 1, "No", "Title", "No Title", None]]},
+    ]}
+
+    df = transform.coach_seasons([nuggets, lakers], "2023-24", None)
+
+    assert list(df["coach_id"]) == [MALONE]
 
 
 class TwoTitlesSource(ReplaySource):

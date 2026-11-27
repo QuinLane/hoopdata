@@ -167,7 +167,7 @@ def coach_seasons(raws, season, season_type):
     and other staff are dropped and new coaching titles are kept.
     """
     df = pd.concat([_result_set(raw, 1) for raw in raws], ignore_index=True)
-    df = df[df["coach_type"].str.contains("Head Coach|Assistant Coach")].copy()
+    df = df[df["coach_type"].str.contains("Head Coach|Assistant Coach", na=False)].copy()
     df["season"] = season
     return df[list(COACH_SEASON_TYPES)].astype(COACH_SEASON_TYPES)
 
